@@ -13,6 +13,7 @@ inchikeys <- unique(na.omit(compound$inchikey))
 smiles <- unique(na.omit(compound$smiles))
 
 # -- SMILES -> CID
+#> This is really slow
 t1b <- Sys.time()
 CIDfromSMILES <- getPubChemCompound(smiles[1:5], from='fastidentity/smiles', 
     to='cids', proxy=TRUE, batch=FALSE)

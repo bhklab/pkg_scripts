@@ -13,9 +13,9 @@ inchikeys <- unique(na.omit(compound$inchikey))
 smiles <- unique(na.omit(compound$smiles))
 
 # -- SMILES -> CID
-#> This is really slow
+# Note: This is really slow
 t1b <- Sys.time()
-CIDfromSMILES <- getPubChemCompound(smiles[1:5], from='fastidentity/smiles', 
+CIDfromSMILES <- getPubChemCompound(smiles[1:100], from='fastidentity/smiles', 
     to='cids', proxy=TRUE, batch=FALSE)
 t2b <- Sys.time()
 q2_time <- t2b - t1b
@@ -38,6 +38,7 @@ q1_time = t2a - t1a
 q1_time
 
 # -- matching syonyms
+# Note: Not working correctly
 SynonymsAndIDs <- getPubChemAnnotations('Synonyms and Identifiers', proxy=TRUE)
 `%vlike%` <- function(patterns, vector) which(vapply(patterns, FUN=like, vector=vector, logical(length(vector))))
-matchingSynoyms <- SynonymsAndIDs[, .(matches=which(compound$unique.drugid %ilike% Synonyms)), by=CID]
+# matchingSynoyms <- SynonymsAndIDs[, .(matches=which(compound$unique.drugid %ilike% Synonyms)), by=CID]

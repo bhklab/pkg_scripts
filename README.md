@@ -1,6 +1,6 @@
 # Package Scripts
 
-A version controller directory to store scripts related to various GitHub repos for R and Python packages.
+A version controlled directory to store scripts related to various GitHub repos for R and Python packages.
 
 ## Usage
 

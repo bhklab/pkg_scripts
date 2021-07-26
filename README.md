@@ -19,7 +19,7 @@ Now add the symbolc link to your `.gitignore` file, so it doesn't get pushed to 
 echo "scripts/*" >> .gitignore
 ```
 
-To update the <pkg_name> repo, just commit as usual. To update the scripts directory, `cd scripts` then make your commits. This will commit all your scripts to the pkg_scripts directory.
+To update the <pkg_name> repo, just commit as usual. To update the scripts directory, `cd scripts` then make your commits. This will commit all your scripts to the pkg_scripts repo.
 
 If you want your scripts to be independent from another user, make a directory with your username before making the <pkg_name> directory.
 

@@ -42,11 +42,11 @@ CIDtoProperties <- getPubChemCompound(cids, proxy=TRUE,
 
 # -- retry CID to properties until no more results are returned
 failedIDs <- getFailedIDs(CIDtoProperties)
-.failedCIDs <- failedIDs # keep old version incase we need to restart
+.failedCIDs <- failedIDs # keep old version in case we need to restart
 if (length(failedIDs) > 0) {
     retryProperties <- getPubChemCompound(failedIDs, proxy=TRUE,
         properties=c('Title', 'IUPACName', 'CanonicalSMILES', 'IsomericSMILES',
-             'InChIKey'))
+            'InChIKey'))
     failedIDs <- getFailedIDs(retryProperties)
     while (nrow(retryProperties) > 0) {
         retryProperties <- getPubChemCompound(failedIDs, proxy=TRUE,
@@ -57,4 +57,32 @@ if (length(failedIDs) > 0) {
     }
 }
 
-# -- map from SID to properties for 
+
+library(data.table)
+library(AnnotationGx)
+
+if (!exists('NSCtoCID')) NSCtoCID <- fread('local_data/NSCtoCID_all.csv')
+if (!exists('CIDtoProperties')) 
+    CIDtoProperties <- fread('local_data/CIDtoProperties_all.csv')
+
+# ---- map from SID to properties for NSC ids without CIDs
+sids <- unique(na.omit(NSCtoCID[is.na(CID), ]$SID))
+SIDtoNames <- getPubChemSubstance(sids[1:100], proxy=TRUE, from='sid',
+    to='synonyms')
+
+# -- retry CID to properties until no more results are returned
+failedIDs <- getFailedIDs(SIDtoProperties)
+.failedSIDs <- failedIDs # keep old version in case we need to restart
+if (length(failedIDs) > 0) {
+    retrySIDProperties <- getPubChemCompound(failedIDs, proxy=TRUE, from='sid',
+        properties=c('Title', 'IUPACName', 'CanonicalSMILES', 'IsomericSMILES',
+            'InChIKey'))
+    failedIDs <- getFailedIDs(retrySIDProperties)
+    while (nrow(retrySIDProperties) > 0) {
+        retrySIDProperties <- getPubChemCompound(failedIDs, proxy=TRUE, sfrom='sid',
+            properties=c('Title', 'IUPACName', 'CanonicalSMILES', 
+            'IsomericSMILES', 'InChIKey'))
+        SIDtoProperties <- rbind(SIDtoProperties, retrySIDProperties)
+        failedIDs <- getFailedIDs(retrySIDProperties)
+    }
+}

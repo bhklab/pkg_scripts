@@ -27,7 +27,6 @@ offset <-  max(as.numeric(gsub('^CIDfromSMILES_|.qs$', '',
         list.files('local_data', pattern='CIDfromSMILES_')))) + 1
 
 # -- SMILES -> CID
-<<<<<<< HEAD
 # Note: This is really slow
 t1b <- Sys.time()
 CIDfromSMILES <- getPubChemCompound(smiles[1:100], from='fastidentity/smiles', 
@@ -35,80 +34,6 @@ CIDfromSMILES <- getPubChemCompound(smiles[1:100], from='fastidentity/smiles',
 t2b <- Sys.time()
 q2_time <- t2b - t1b
 q2_time
-=======
-#> This is really slow
-smiles_split <- split(smiles, floor(seq_along(smiles) / 1000))
-CIDfromSMILES_list <- vector('list', length(smiles_split))
-total <- Reduce(sum, lapply(smiles_split, length)[1:(offset-1)])
-total_q_time <- bench_time({ })[2]
-for (i in seq(offset, length(smiles_split))) {
-    print(paste0('Batch: ', i, '/', length(smiles_split)))
-    total <- total + length(smiles_split[[i]])
-    q_time <- bench_time({
-        CIDfromSMILES_list[[i]] <- getPubChemCompound(smiles_split[[i]], 
-            from='smiles', to='cids', proxy=TRUE, batch=FALSE)
-    })[2]
-    qsave(CIDfromSMILES_list[[i]], 
-        file=paste0('local_data/CIDfromSMILES_', i, '.qs'))
-    print(paste0('Queries done: ', total, '/', length(unlist(smiles_split))))
-    print(paste0('Batch took: ', q_time))
-    total_q_time <- total_q_time + q_time[2]
-    print(paste0('Average query time: ', as.numeric(total_q_time) / i))
-}
-
-# -- Read in all the mappings
-CIDfromSMILES_files <- list.files('local_data', pattern='CIDfromSMILES_.*qs', 
-    full.names=TRUE)
-CIDfromSMILES_DTs <- lapply(CIDfromSMILES_files, qread)
-CIDfromSMILES <- rbindlist(CIDfromSMILES_DTs)
-CIDfromSMILES[cids == 0, cids := NA]
-CIDfromSMILES <- CIDfromSMILES[!is.na(cids), ]
-
-# -- Identify missing mappings
-failedSmiles <- setdiff(smiles, CIDfromSMILES$smiles)
-
-# reload from file
-failedSmiles <- unlist(fread('local_data/failed_smiles.csv'))
-
-# -- Retry failed SMILES
-offset <- max(as.numeric(gsub('^retryCIDfromSMILES_|.qs$', '', 
-    list.files('local_data', pattern='retryCIDfromSMILES_')))) + 1
-if (is.infinite(offset)) offset <- 1
-
-failed_smiles_split <- split(failedSmiles, floor(seq_along(failedSmiles) / 1000))
-retryCIDfromSMILES_list <- vector('list', length(failed_smiles_split))
-ftotal <- Reduce(sum, lapply(failed_smiles_split, length)[1:(offset-1)])
-ftotal_q_time <- bench_time({ })[2]
-for (i in seq(offset, length(failed_smiles_split))) {
-    print(paste0('Batch: ', i, '/', length(failed_smiles_split)))
-    ftotal <- ftotal + length(failed_smiles_split[[i]])
-    q_time1 <- bench_time({
-        retryCIDfromSMILES_list[[i]] <- getPubChemCompound(failed_smiles_split[[i]], 
-            from='fastidentity/smiles', to='cids', proxy=TRUE, batch=FALSE)
-    })[2]
-    qsave(retryCIDfromSMILES_list[[i]], 
-        file=paste0('local_data/retryCIDfromSMILES_', i, '.qs'))
-    print(paste0('Queries done: ', ftotal, '/', length(unlist(failed_smiles_split))))
-    print(paste0('Batch took: ', q_time1))
-    ftotal_q_time <- ftotal_q_time + q_time1[2]
-    print(paste0('Average query time: ', as.numeric(ftotal_q_time) / i))
-}
-
-# read in data
-doneFiles <- list.files('local_data', pattern='retryCIDfromSMILES_', 
-    full.names=TRUE)
-doneDTs <- lapply(doneFiles, qread)
-retryCIDfromSMILES <- rbindlist(doneDTs)
-CIDfromSMILES <- rbind(CIDfromSMILES, retryCIDfromSMILES)
-
-# capute the failures
-failedAgainSmiles <- setdiff(failedSmiles, retryCIDfromSMILES$`fastidentity/smiles`)
-
-# -- Final attempt at mapping
-finalCIDfromSMILES <- getPubChemCompound(failedAgainSmiles, 
-    from='fastidentity/smiles', to='cids', proxy=TRUE, batch=FALSE)
-CIDfromSMILES <- rbind(CIDfromSMILES, retryCIDfromSMILES)
->>>>>>> 658b86ce04fd373564f38baf3cf0c7e419106083
 
 # -- CID -> properties
 cids <- na.omit(unique(CIDfromSMILES$cids))
@@ -192,9 +117,4 @@ q1_time
 # Note: Not working correctly
 SynonymsAndIDs <- getPubChemAnnotations('Synonyms and Identifiers', proxy=TRUE)
 `%vlike%` <- function(patterns, vector) which(vapply(patterns, FUN=like, vector=vector, logical(length(vector))))
-<<<<<<< HEAD
 # matchingSynoyms <- SynonymsAndIDs[, .(matches=which(compound$unique.drugid %ilike% Synonyms)), by=CID]
-=======
-matchingSynoyms <- SynonymsAndIDs[, .(matches=which(compound$unique.drugid %ilike% Synonyms)), by=CID]
-
->>>>>>> 658b86ce04fd373564f38baf3cf0c7e419106083

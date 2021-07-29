@@ -1,20 +1,23 @@
-#!/bin/R
+#!/bin/r
 
 # -- Required
+library(PharmacoGx)
 library(CoreGx)
-library(BumpyMatrix)
-library(SummarizedExperiment)
-
-# -- Utilities
-library(qs)
 library(data.table)
+library(qs)
+library(BumpyMatrix)
 
-## ==========================================
-## ---- LongTable to gDR SummarizedExperiment
-## ==========================================
 
-# -- Load in the LongTable
-LT <- qread('local_data/NCI_ALMANAC_LT.qs')
+# -- Download some data
+dataset <- 'CCLE'
+availPSets <- as.data.table(availablePSets())
+assign(dataset,
+    downloadPSet(availPSets[`Dataset Name` == dataset, ]$`PSet Name`,
+        saveDir='local_data'))
+
+LT <- CoreGx:::.sensitivityToLongTable(get(dataset))
+# drop NA values, should do this automatically in function
+LT$sensitivity <- na.omit(LT$sensitivity)
 
 # ---- Convert assays to BumpyMatrix
 # NOTE: We will need to pad the assays
@@ -44,7 +47,7 @@ LT <- qread('local_data/NCI_ALMANAC_LT.qs')
         row=assay_data$rownames, column=assay_data$colnames, sparse)
 }
 
-# ---- Convert LongTable to gDR SummarizedExperiment
+#' Convert LongTable to gDR Style SummarizedExperiment
 #'
 #' @param LT `LongTable` to convert to gDR `SummarizedExperiment` format.
 #' @param assay_names `character()` Names to rename the assays to. These
@@ -67,6 +70,7 @@ LT <- qread('local_data/NCI_ALMANAC_LT.qs')
     )
 }
 
-# -- build the SummarizedExperiment
-SE <- .longTableToSummarizedExperiment(LT, 
-    assay_names=c("Viability", "Metrics", "AssayMetadata"))
+CCLE_SE <- .longTableToSummarizedExperiment(LT, 
+    assay_names=c('Viability', 'Metrics', 'AssayMetadata'))
+
+qsave(CCLE_SE, file=file.path('local_data', 'CCLE_gDR.qs'))

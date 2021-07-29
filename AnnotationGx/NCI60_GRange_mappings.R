@@ -21,6 +21,7 @@ orgDB <- org.Hs.eg.db
 for (i in seq_along(molecularProfilesSlot(NCI))) {
 
     SE <- molecularProfilesSlot(NCI)[[i]]
+    # If you don't have ranged summarized experiments, just swap for rowData
     rRanges <- rowRanges(SE)
 
     ## TODO:: Implement mapping for mirna if possible?

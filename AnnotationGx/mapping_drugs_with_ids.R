@@ -37,7 +37,7 @@ q2_time
 
 # -- CID -> properties
 cids <- na.omit(unique(CIDfromSMILES$cids))
-NameFromCID <- getPubChemCompound(cids, proxy=TRUE, 
+NameFromCID <- getPubChemCompound(cids, proxy=TRUE,
     properties=c("Title", "IUPACName"))
 
 # -- Load the data an join together with drugs_with_ids

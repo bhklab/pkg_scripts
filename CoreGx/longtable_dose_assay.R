@@ -46,5 +46,6 @@ a1 <- merge.data.table(a1, cData, by="colKey")
 # =======================
 # ---- Summarize an assay
 
-a2 <- a1[, lapply(.SD, mean), by=c(rKeys, cKeys)]
+# Drawback: lose ability to reconstruct the original data
+a2 <- a1[, c(lapply(.SD, mean), .(n=.N)), by=c(rKeys, cKeys)]
 a2[, (c(rKeys, cKeys)) := NULL]

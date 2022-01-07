@@ -67,6 +67,7 @@ a2 <- a1[, .SD, .SDcols=!c(rCols, cCols)][,
 
 a3 <- merge.data.table(a2, rData, by="rowKey")
 a3 <- merge.data.table(a3, cData, by="colKey")
+setkeyv(a3, c("rowKey", "colKey"))
 
 
 # ===============
@@ -97,8 +98,12 @@ a3_1 <- a3[, .SD, .SDcols=!c(rCols, cCols)][i, , env=list(i=sub_expr)]
 dose_range <- c(1.0e-10, 1.0e-8)
 a1_2 <- a1[drug1dose %between% dose_range, ]
 keep_dims <- lapply(a1_2[, .(rowKey, colKey)], FUN=unique)
+i <- unique(a1_2[, .(rowKey, colKey)])
 
 # Subset other assays
-a2_2 <- 
+a2_2 <- a2[i, ]
+a3_2 <- a3[i, ]
 
 # Subset the metadata
+cData2 <- cData[colKey %in% unique(keep_dims$colKey)]
+rData2 <- rData[rowKey %in% unique(keep_dims$rowKey)]

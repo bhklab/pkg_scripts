@@ -49,26 +49,24 @@ assay_raw[, (c(rCols, cCols)) := NULL]
 # Join with metadata
 a1 <- merge.data.table(assay_raw, rData, by="rowKey")
 a1 <- merge.data.table(a1, cData, by="colKey")
-a1[, (c("rowKey", "colKey")) := NULL]
-
+setkeyv(a1, c("rowKey", "colKey"))
 
 # =======================
 # ---- Summarize an assay
 
 # Drawback: lose ability to reconstruct the original data
 # Benefit: subset with keys doesn't corrupt summaries, subset with assay does
-a2 <- a1[, !c("PANEL", "SCREENER")][,
+a2 <- a1[, .SD, .SDcols=!c(rCols, cCols)][,
     c(lapply(.SD, mean), .(n=.N)),
-    by=c(rKeys, cKeys)
+    by=.(rowKey, colKey)
 ]
 
 
 # =======================
 # ---- Retrieve a summary
 
-a3 <- merge.data.table(a2, rData, by=rKeys)
-a3 <- merge.data.table(a3, cData, by=cKeys)
-a3[, (c("rowKey", "colKey")) := NULL]
+a3 <- merge.data.table(a2, rData, by="rowKey")
+a3 <- merge.data.table(a3, cData, by="colKey")
 
 
 # ===============
@@ -83,14 +81,24 @@ keep_cols <- cData[cellid == "A498", ]$colKey
 
 # Subset metadata
 cData1 <- cData[colKey %in% keep_cols, ]
-rData1 <- rData[rowKey %in% keep_rows]
+rData1 <- rData[rowKey %in% keep_rows, ]
 
 # Subset assays
 sub_expr <- quote(rowKey %in% keep_rows & colKey %in% keep_cols)
-a11 <- a1[i, , env=list(i=sub_expr)]
-a22 <- a2[rowKey %in% keep_rows & colKey %in% keep_cols, ]
-a33 <- a3[]
+a1_1 <- a1[, .SD, .SDcols=!c(rCols, cCols)][i, , env=list(i=sub_expr)]
+a2_1 <- a2[i, , env=list(i=sub_expr)]
+a3_1 <- a3[, .SD, .SDcols=!c(rCols, cCols)][i, , env=list(i=sub_expr)]
 
 # -- Subset by assay
-
 ## NOTE: This will corrupt summaries, do we want to allow that?
+## Could drop the effected keys? That is probably a good idea
+
+# Find the dimensions matching the criteria, in this case doses in a range
+dose_range <- c(1.0e-10, 1.0e-8)
+a1_2 <- a1[drug1dose %between% dose_range, ]
+keep_dims <- lapply(a1_2[, .(rowKey, colKey)], FUN=unique)
+
+# Subset other assays
+a2_2 <- 
+
+# Subset the metadata

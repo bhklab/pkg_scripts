@@ -60,8 +60,6 @@ a2_joined <- merge.data.table(cd1, assay2, by="colKey", allow.cartesian=TRUE)
 
 
 
-
-
 # ================
 # ---- Aggregation
 
@@ -69,3 +67,8 @@ a2_joined <- merge.data.table(cd1, assay2, by="colKey", allow.cartesian=TRUE)
 
 # ==============
 # ---- Modelling
+
+
+
+# =============
+# ---- Coercion

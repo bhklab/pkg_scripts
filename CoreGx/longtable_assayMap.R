@@ -12,7 +12,7 @@ annotPath <- '../../Annotations'
 # -- Read in data
 exp_DT <- fread(file.path(dataPath,
     'NCI_ComboDrugGrowth_Nov2017.csv'))
-drug_DT <- fread(file.path(dataPath, 
+drug_DT <- fread(file.path(dataPath,
     'NCI_compound_names.tsv'))
 colnames(drug_DT) <- c('NSC', 'drug_name')
 
@@ -52,12 +52,21 @@ groups <- list(
 ## TODO:: Implement the faster version of this using a matrix
 guess <- guessMapping(dataMapperLT, groups=groups, subset=TRUE)
 
-assayMap <- list(
-    sensitivity=c("CONCINDEX2", "SAMPLE1", "SAMPLE2",
-        viability='PERCENTGROWTH', 'PERCENTGROWTHNOTZ', 'EXPECTEDGROWTH',
-        "TESTVALUE", "CONTROLVALUE", "TZVALUE"),
-    profiles=c('SCORE'),
-    assay_metadata=c('COMBODRUGSEQ', 'STUDY', 'TESTDATE', 'PLATE')
+assayMap_ <- list(
+    sensitivity=list(
+        keys=groups$assayMap,
+        values=c("CONCINDEX2", "SAMPLE1", "SAMPLE2",
+            viability='PERCENTGROWTH', 'PERCENTGROWTHNOTZ',
+            'EXPECTEDGROWTH', "TESTVALUE", "CONTROLVALUE", "TZVALUE")
+    ),
+    profiles=list(
+        keys=groups$assayMap,
+        values=c('SCORE')
+    ),
+    assay_metadata=list(
+        keys=groups$assayMap,
+        values=c('COMBODRUGSEQ', 'STUDY', 'TESTDATE', 'PLATE')
+    )
 )
 
 ## -- Define mappings for row and column annotations
@@ -77,11 +86,11 @@ aKeys <- groups$assayMap
 
 nci_DT[, rowKey := .GRP, by=c(guess$rowDataMap$id_columns)]
 nci_DT[, colKey := .GRP, by=c(guess$colDataMap$id_columns)]
-nci_DT[, ogKey := .GRP, by=.(rowKey, colKey)]
+nci_DT[, ogKey := .GRP, keyby=.(rowKey, colKey)]
 
-a1 <- unique(nci_DT[, .SD, .SDcols=c("ogKey", assayMap$sensitivity)])
-a2 <- unique(nci_DT[, .SD, .SDcols=c("ogKey", assayMap$profiles)])
-a3 <- unique(nci_DT[, .SD, .SDcols=c("ogKey", assayMap$assay_metadata)])
+a1 <- unique(nci_DT[, .SD, .SDcols=c("ogKey", assayMap_$sensitivity$values)])
+a2 <- unique(nci_DT[, .SD, .SDcols=c("ogKey", assayMap_$profiles$values)])
+a3 <- unique(nci_DT[, .SD, .SDcols=c("ogKey", assayMap_$assay_metadata$values)])
 assays <- list(a1, a2, a3)
 for (a in assays) setkeyv(a, "ogKey")
 
@@ -98,3 +107,8 @@ for (o_ in obj_) setkeyv(o_, c("ogKey", "rowKey", "colKey"))
 # reduce merge
 dt_ <- Reduce(f=merge, obj_)
 dt_ <- cbind(dt_, as.data.table(metadata_))
+
+
+## -- metaConstruct works
+rowDataMap(dataMapperLT) <- guess$rowDataMap
+colDataMap(dataMapperLT) <- guess$colDataMap

@@ -54,18 +54,18 @@ guess <- guessMapping(dataMapperLT, groups=groups, subset=TRUE)
 
 assayMap_ <- list(
     sensitivity=list(
-        keys=groups$assayMap,
-        values=c("CONCINDEX2", "SAMPLE1", "SAMPLE2",
+        id_columns=groups$assayMap,
+        mapped_columns=c("CONCINDEX2", "SAMPLE1", "SAMPLE2",
             viability='PERCENTGROWTH', 'PERCENTGROWTHNOTZ',
             'EXPECTEDGROWTH', "TESTVALUE", "CONTROLVALUE", "TZVALUE")
     ),
     profiles=list(
-        keys=groups$assayMap,
-        values=c('SCORE')
+        id_columns=groups$assayMap,
+        mapped_columns=c('SCORE')
     ),
     assay_metadata=list(
-        keys=groups$assayMap,
-        values=c('COMBODRUGSEQ', 'STUDY', 'TESTDATE', 'PLATE')
+        id_columns=groups$assayMap,
+        mapped_columns=c('COMBODRUGSEQ', 'STUDY', 'TESTDATE', 'PLATE')
     )
 )
 
@@ -110,5 +110,10 @@ dt_ <- cbind(dt_, as.data.table(metadata_))
 
 
 ## -- metaConstruct works
+## FIXME:: Why is this assignment slow?
 rowDataMap(dataMapperLT) <- guess$rowDataMap
 colDataMap(dataMapperLT) <- guess$colDataMap
+assayMap(dataMapperLT) <- assayMap_
+metadataMap(dataMapperLT) <- list(
+    experiment_metadata=guess$metadata$mapped_columns
+)

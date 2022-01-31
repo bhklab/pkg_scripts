@@ -32,7 +32,8 @@ cello_df <- cello |>
     left_join(dataset, by=c(dataset_id="id")) |>
     rename(dataset_name="name", cell_name="identifier") |>
     select(-id.x, id.y) |>
-    collect()
+    collect() |>
+    as.data.table()
 
 # -- Find all sarcoma cell-lines in all datasets
 sarcoma_df <- cello_df |>

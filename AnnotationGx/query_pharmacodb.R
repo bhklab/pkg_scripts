@@ -31,7 +31,7 @@ cello_df <- cello |>
     left_join(dataset_cell, by=c(cell_id="cell_id")) |>
     left_join(dataset, by=c(dataset_id="id")) |>
     rename(dataset_name="name", cell_name="identifier") |>
-    select(-id.x, id.y) |>
+    select(-id.x, -id.y) |>
     collect() |>
     as.data.table()
 

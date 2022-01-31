@@ -21,3 +21,6 @@ sarc_df <- flat_df[,
     lapply(.SD, \(x) paste0(unique(x), collapse="|")),
     by=NCTId
 ]
+
+fwrite(flat_df, file="local_data/sarcoma_treatment_by_condition.csv")
+fwrite(sarc_df, file="local_data/sarcoma_treatment_by_study.csv")

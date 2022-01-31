@@ -45,6 +45,16 @@ sarcoma_cell_df <- sarcoma_df[,
     lapply(.SD, FUN=\(x) list(unique(x))),
     by=cell_name]
 sarcoma_cell_df[, di := unlist(di)]
+sarcoma_cell_df[, di := gsub("\\|+", "|", di)]
 
 # -- Write table to disk
 fwrite(sarcoma_cell_df, file="local_data/pharmacodb_sarcoma_cells.csv")
+
+# -- Filter non-soft-tissue sarcoma
+soft_sarcoma_cell_df <- sarcoma_cell_df[!(di %ilike% "osteosarcoma"), ]
+fwrite(soft_sarcoma_cell_df,
+    file="local_data/pharmacodb_soft_sarcoma_cells.csv")
+
+soft_no_ewing_cell_df <- soft_sarcoma_cell_df[!(di %ilike% "ewing"), ]
+fwrite(soft_no_ewing_cell_df,
+    file="local_data/pharmacodb_soft_no_ewing_sarcoma_cell.csv")

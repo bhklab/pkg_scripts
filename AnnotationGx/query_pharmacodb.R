@@ -21,12 +21,29 @@ CON <- dbConnect(
 
 # Queries
 
-# -- Cellosarus table
+# -- Cellosaurus and cell tables
 cello <- tbl(CON, "cellosaurus")
-cell <- tbl(CON, "cell")
+dataset <- tbl(CON, "dataset")
+dataset_cell <- tbl(CON, "dataset_cell")
 
-cell_df <- cello |>
-    left_join(cell, by=c(cell_id="id")) |>
-    filter(di %like% "%sarcoma%") |>
-    select(name, di) |>
+# -- Build a cellosaurus table with cell and dataset identifiers
+cello_df <- cello |>
+    left_join(dataset_cell, by=c(cell_id="cell_id")) |>
+    left_join(dataset, by=c(dataset_id="id")) |>
+    rename(dataset_name="name", cell_name="identifier") |>
+    select(-id.x, id.y) |>
     collect()
+
+# -- Find all sarcoma cell-lines in all datasets
+sarcoma_df <- cello_df |>
+    filter(di %like% "sarcoma") |>
+    select(cell_name, di, dataset_name)
+
+# -- Group by dataset
+sarcoma_cell_df <- sarcoma_df[,
+    lapply(.SD, FUN=\(x) list(unique(x))),
+    by=cell_name]
+sarcoma_cell_df[, di := unlist(di)]
+
+# -- Write table to disk
+fwrite(sarcoma_cell_df, file="local_data/pharmacodb_sarcoma_cells.csv")

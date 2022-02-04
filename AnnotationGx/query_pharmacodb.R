@@ -1,5 +1,6 @@
 library(dbplyr)
 library(RMariaDB)  # for MySQL DB connector
+library(dplyr)
 library(data.table)
 
 # Load credentials from the environment

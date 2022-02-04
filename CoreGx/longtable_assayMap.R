@@ -88,9 +88,12 @@ nci_DT[, rowKey := .GRP, by=c(guess$rowDataMap$id_columns)]
 nci_DT[, colKey := .GRP, by=c(guess$colDataMap$id_columns)]
 nci_DT[, ogKey := .GRP, keyby=.(rowKey, colKey)]
 
-a1 <- unique(nci_DT[, .SD, .SDcols=c("ogKey", assayMap_$sensitivity$values)])
-a2 <- unique(nci_DT[, .SD, .SDcols=c("ogKey", assayMap_$profiles$values)])
-a3 <- unique(nci_DT[, .SD, .SDcols=c("ogKey", assayMap_$assay_metadata$values)])
+a1 <- unique(nci_DT[,
+    .SD, .SDcols=c("ogKey", assayMap_$sensitivity$mapped_columns)])
+a2 <- unique(nci_DT[,
+    .SD, .SDcols=c("ogKey", assayMap_$profiles$mapped_columns)])
+a3 <- unique(nci_DT[,
+    .SD, .SDcols=c("ogKey", assayMap_$assay_metadata$mapped_columns)])
 assays <- list(a1, a2, a3)
 for (a in assays) setkeyv(a, "ogKey")
 

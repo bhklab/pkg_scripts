@@ -17,22 +17,18 @@ drug_DT <- fread(file.path(dataPath,
 colnames(drug_DT) <- c('NSC', 'drug_name')
 
 # -- Drop drugs with duplicated NSC ids
-duplicatedDrugs <- drug_DT[duplicated(NSC) |
-    duplicated(drug_name), ]
-drug_DT <- drug_DT[!(duplicated(NSC) |
-    duplicated(drug_name)), ]
+duplicatedDrugs <- drug_DT[duplicated(NSC) | duplicated(drug_name), ]
+drug_DT <- drug_DT[!(duplicated(NSC) | duplicated(drug_name)), ]
 
 # -- Join to map to names of drug1
 #    and drug2 in combo
-nci_DT <- merge.data.table(exp_DT, drug_DT,
-    by.x='NSC1', by.y='NSC')
+nci_DT <- merge.data.table(exp_DT, drug_DT, by.x='NSC1', by.y='NSC')
 setnames(nci_DT,
     old=c('drug_name', 'CONC1'),
     new=c('drug1id', 'drug1dose'),
     skip_absent=TRUE)
 
-nci_DT <- merge.data.table(nci_DT, drug_DT,
-    by.x='NSC2', by.y='NSC')
+nci_DT <- merge.data.table(nci_DT, drug_DT, by.x='NSC2', by.y='NSC')
 setnames(nci_DT,
     old=c('drug_name', 'CONC2', 'CELLNAME'),
     new=c('drug2id', 'drug2dose', "cellid"),
@@ -120,3 +116,4 @@ assayMap(dataMapperLT) <- assayMap_
 metadataMap(dataMapperLT) <- list(
     experiment_metadata=guess$metadata$mapped_columns
 )
+

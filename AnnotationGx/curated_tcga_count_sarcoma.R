@@ -9,7 +9,7 @@ data(diseaseCodes, package="TCGAutils")
 
 # -- Download all Sarcoma data into an MAE
 sarc_mae <- curatedTCGAData(diseaseCode="SARC",
-    c("RNASeq2Gene", "Methylation", "*CNA*", "*miRNASeq*", "*RPPA*"),
+    c("RNASeq2Gene", "Methylation", "*CNA*", "*miRNASeq*", "*RPPA*", "*Mutation*"),
     version="2.0.1",
     dry.run=FALSE
 )

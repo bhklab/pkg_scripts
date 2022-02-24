@@ -35,7 +35,7 @@ fwrite(tcga_df, file=file.path(".", "local_data", "tcga_breast_rnaseq_mat.csv"))
 
 # get interesting patients based on biomarker of interest
 set.seed(19900501)
-biomarkers <- c("ERBB2", "EGFR")
+biomarkers <- c("ERBB2", "EGFR", "MET", "GPRC5A")
 for (feat in biomarkers) {
     # get random sample over specified percentile
     sample <- tcga_df_melt[

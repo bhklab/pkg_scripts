@@ -59,3 +59,76 @@ fwrite(soft_sarcoma_cell_df,
 soft_no_ewing_cell_df <- soft_sarcoma_cell_df[!(di %ilike% "ewing"), ]
 fwrite(soft_no_ewing_cell_df,
     file="local_data/pharmacodb_soft_no_ewing_sarcoma_cell.csv")
+
+# -- Mapping cells to drugs
+compound <- tbl(CON, "compound")
+compound_annot <- tbl(CON, "compound_annotation")
+experiment <- tbl(CON, "experiment")
+cell <-tbl(CON, "cell")
+
+acompound <- compound |>
+    left_join(compound_annot |> select(-id), by=c(id="compound_id")) |>
+    select(compound_id=id, name)
+
+compound_cell <- experiment |>
+    select(cell_id, compound_id) |>
+    distinct() |>
+    left_join(cell, by=c(cell_id="id")) |>
+    left_join(acompound, by="compound_id") |>
+    select(compound=name.y, cell_name=name.x) |>
+    collect() |>
+    as.data.table()
+
+sarcoma_compound <- merge.data.table(
+    sarcoma_df,
+    compound_cell,
+    by="cell_name"
+)
+
+# clean up disease names
+sarcoma_compound[, di := gsub(".*; ", "", di)]
+
+sarcoma_compound_by_cell <- sarcoma_compound[,
+    .(compounds=list(unique(compound))),
+    by=cell_name
+]
+
+# load TCGA compound names to intersect
+data_dir <- "local_data"
+tcga_sarcoma_compound <- fread(file.path(data_dir,
+    "tcga_sarcoma_compound_by_sample.csv"))
+compound_query <- unique(tcga_sarcoma_compound$drug_name)
+pdb_tcga_sarcoma_compound <- sarcoma_compound[compound %in% compound_query, ]
+
+pdb_tcga_compound_by_cell <- pbd_tcga_sarcoma_compound[,
+    .(compound=paste(unique(compound), collapse="|")),
+    by=cell_name
+]
+
+pdb_tcga_compound_by_disease <- pbd_tcga_sarcoma_compound[,
+    .(compound=paste(unique(compound), collapse="|"),
+    num_cell_line=length(unique(cell_name))),
+    by=di
+][order(-num_cell_line), ]
+
+fwrite(pdb_tcga_sarcoma_compound, file=file.path(data_dir,
+    "pdb_tcga_sarcoma_compound.csv"))
+fwrite(pdb_tcga_compound_by_disease, file=file.path(data_dir,
+    "pdb_tcga_compound_by_disease.csv"))
+
+sample_compound_disease <- pbd_tcga_sarcoma_compound[di %ilike% "leiomyo",
+    .(n_cell_line=length(cell_name),
+    n_unique_cell_line=uniqueN(cell_name),
+    n_datsets=uniqueN(dataset_name)),
+    by=.(di, compound)
+][order(-n_cell_line)]
+
+fwrite(sample_compound_disease, file=file.path(data_dir,
+    "cell_line_by_compound_disease_pdb.csv"))
+
+sample_compound_lms <- pbd_tcga_sarcoma_compound[di %ilike% "leiomyo",
+    .(n_cell_line=length(cell_name),
+    n_unique_cell_line=uniqueN(cell_name),
+    n_datsets=uniqueN(dataset_name)),
+    by=.(compound)
+][order(-n_cell_line)]

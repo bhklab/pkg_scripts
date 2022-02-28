@@ -48,7 +48,7 @@ for (i in seq_along(molecularProfilesSlot(NCI))) {
     mcolsDT <- as.data.table(mcols(rRanges))
     entrez <- as.character(mcolsDT[is.na(ENSEMBL), Entrez.gene.id])
 
-    res1 <- as.data.table(select(orgDB, keys=entrez, columns=c('ENSEMBL'), 
+    res1 <- as.data.table(select(orgDB, keys=entrez, columns=c('ENSEMBL'),
         keytype='ENTREZID'))
     moreMappingsDT <- res1[!is.na(ENSEMBL), lapply(.SD, first), by=ENTREZID]
     moreMappingsDT[, ENTREZID := as.numeric(ENTREZID)]
@@ -61,9 +61,9 @@ for (i in seq_along(molecularProfilesSlot(NCI))) {
     # -- 6.4 Map to ENSEMBL transcripts
     ensembl <- na.omit(mcols(rRanges)$ENSEMBL)
 
-    tx_ids <- as.data.table(select(orgDB, keys=ensembl, columns=c('ENSEMBLTRANS'), 
+    tx_ids <- as.data.table(select(orgDB, keys=ensembl, columns=c('ENSEMBLTRANS'),
         keytype='ENSEMBL'))
-    txByEnsembl <- tx_ids[!is.na(ENSEMBLTRANS), lapply(.SD, paste, collapse='|'), 
+    txByEnsembl <- tx_ids[!is.na(ENSEMBLTRANS), lapply(.SD, paste, collapse='|'),
         by=ENSEMBL]
 
     mcolsDT <- merge.data.table(mcolsDT, txByEnsembl, by='ENSEMBL', all.x=TRUE)
@@ -72,7 +72,7 @@ for (i in seq_along(molecularProfilesSlot(NCI))) {
             'Gene.name.url', 'Entrez.gene.id.url', 'Genomic.coordinate.url',
             'GENENAME'),
         new=c('ensembl_gid', 'ensembl_tid', 'entrez_gid', 'cytoband', 'hugo_symbol',
-            'gene_name_url', 'entrez_gid_url', 'genomic_coord_url', 
+            'gene_name_url', 'entrez_gid_url', 'genomic_coord_url',
             'gene_description'),
         skip_absent=TRUE)
 
@@ -115,7 +115,7 @@ rRanges <- rowRanges(SE)
 
 # -- 2.1 Fetch the Ensembl TxDB object
 # 104 is latest version of GRCh37 (hg19)
-EnsTxDB <- makeTxDbFromEnsembl(release=104) 
+EnsTxDB <- makeTxDbFromEnsembl(release=104)
 # Match the chromosome naming conventions
 seqlevelsStyle(EnsTxDB) <- 'Ensembl'
 seqlevelsStyle(rRanges) <- 'Ensembl'
@@ -169,7 +169,7 @@ mcols(rRanges2) <- cbind(mcols(rRanges2), mcols(tRanges2)[nolaps_trans2, ])
 supportedUCSCtables(genome='hg19')
 
 # Trying with UCSC default first
-UCSCTxDB <- makeTxDbFromUCSC(genome='hg19', 
+UCSCTxDB <- makeTxDbFromUCSC(genome='hg19',
     tablename='ensGene')
 seqlevelsStyle(UCSCTxDB) <- 'Ensembl'
 
@@ -211,10 +211,5 @@ nolaps_trans4 <- nearest(rRanges, tRanges4)
 # -- 5.3 Add the overlapping metadata
 rRanges4 <- rRanges
 mcols(rRanges4)<- cbind(mcols(rRanges4), mcols(gRanges4)[nolaps_genes4, ])
-mcols(rRanges4) <- cbind(mcols(rRanges4), 
+mcols(rRanges4) <- cbind(mcols(rRanges4),
     mcols(tRanges4)[nolaps_trans4, c('tx_id', 'tx_biotype')])
-
-
-
-
-

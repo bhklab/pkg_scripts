@@ -3,6 +3,9 @@ library(dplyr)
 library(data.table)
 library(MultiAssayExperiment)
 library(S4Vectors)
+library(qs)
+
+## NOTE:: This script requires ~ 40 GB of RAM
 
 # -- Find datasets of interest
 
@@ -49,3 +52,54 @@ XenaGenerate(subset=XenaCohorts == cohort & XenaDatasets %in% datasets) |>
     XenaDownload(destdir="local_data", download_probeMap=TRUE) |>
     XenaPrepare() ->
     mol_data
+
+# -- Build MultiAssayExperiment
+
+# colData
+for (df in pheno_data) setDT(df)
+pheno_idx <- grep("phenotype", names(pheno_data))
+cData <- copy(pheno_data[[pheno_idx]])
+setkeyv(cData, "sample")
+pData <- copy(pheno_data[-pheno_idx])
+for (df in pData) {
+    setkeyv(df, "sample")
+    cData <- df[cData, , on="sample"]  # data.table subset join x[y, ]
+}
+
+# rowData
+for (df in mol_data) setDT(df)
+probemap_idx <- grep("probemap", names(mol_data))
+rData <- copy(mol_data[[probemap_idx]])
+mData <- copy(mol_data[-probemap_idx])
+
+# assays
+for (i in seq_along(mData)) {
+    mData[[i]] <- as.matrix(mData[[i]], rownames="sample")
+}
+
+# metadata
+metadata <- list(
+    phenotype_data=xd[XenaCohorts == cohort & Type == "clinicalMatrix"],
+    molecular_data=xd[XenaDatasets %in% datasets, ],
+    sessionInfo=sessionInfo()
+)
+
+# experiments
+se_list <- vector("list", length(mData))
+setkeyv(cData, "sample")
+setkeyv(rData, "id")
+for (i in seq_along(mData)) {
+    se_list[[i]] <- SummarizedExperiment(
+        assay=mData[[i]],
+        colData=cData[colnames(mData[[i]]), ],
+        rowData=rData[rownames(mData[[i]]), ]
+    )
+}
+se_list <- setNames(se_list, names(mData))
+
+# MultiAssayExperient
+mae <- MultiAssayExperiment(experiments=se_list, metadata=metadata)
+
+message("INFO: This object is ", format(object.size(mae), "GiB"), " in memory!")
+qsave(mae, file=file.path("local_data", paste0(make.names(cohort), "_mae.qs")),
+    nthread=getDTthreads())

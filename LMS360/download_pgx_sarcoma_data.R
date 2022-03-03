@@ -1,12 +1,15 @@
 library(PharmacoGx)
 library(data.table)
 library(BiocParallel)
+library(qs)
 
 pharmacoset_dir <- file.path("..", "PharmacoGx", "local_data")
 if (!dir.exists(pharmacoset_dir)) dir.create(pharmacoset_dir, recursive=TRUE)
 
+out_dir <- file.path("local_data")
+
 pset_metadata <- file.path("..", "AnnotationGx", "local_data")
-sarcoma_cells <- fread(file.path(pset_metadata, "pharmacodb_sarcoma_cells.csv")
+sarcoma_cells <- fread(file.path(pset_metadata, "pharmacodb_sarcoma_cells.csv"))
 
 # clean up disease names
 sarcoma_cells[, c("ncit_disease", "ordo_disease") := tstrsplit(di, split="\\|")]
@@ -37,15 +40,31 @@ bp <- bpparam()
 bpworkers(bp) <- 8
 bpprogressbar(bp) <- TRUE
 
-sarcoma_psets <- bplapply(download_psets, FUN=downloadPSet,
-    saveDir=pharmacoset_dir, BPPARAM=bp)
+pset_file <- file.path(pharmacoset_dir, "sarc_psets.qs")
+if (!file.exists(pset_file)) {
+    sarc_psets <- bplapply(download_psets, FUN=downloadPSet,
+    saveDir=pharmacoset_dir, BPPARAM=bp, timeout=1e6)
+    qsave(sarc_psets, file=pset_file, nthread=getDTthreads())
+} else {
+    sarc_psets <- qread(pset_file, nthread=getDTthreads())
+}
 
 # subset PharmacoSets to only relevant cell-lines
-bp <- bpparam()
-bpworkers(bp) <- 8
-bpprogressbar(bp) <- TRUE
+keep_cells <- sarcoma_df[, unique(cell_name)]
+sarcsets <- bplapply(sarc_psets,
+        FUN=\(x, keep_cells) {
+    cells <- intersect(cellNames(x), keep_cells)
+    subsetTo(x, cell=cells, molecular.data.cells=cells)
+}, keep_cells=keep_cells, BPPARAM=bp)
 
-sarcoma_psets <- bplapply(download_psets, FUN=downloadPSet,
-    saveDir=pharmacoset_dir, BPPARAM=bp)
+# add additional metadata
+colnames(sarcoma_df)[2:ncol(sarcoma_df)] <- paste0("pharmacodb.",
+    colnames(sarcoma_df)[2:ncol(sarcoma_df)])
+for (i in seq_along(sarcsets)) {
+    cellInfo(sarcsets[[i]]) <- merge(cellInfo(sarcsets[[i]]), sarcoma_df,
+        by.x="cellid", by.y="cell_name")
+}
 
-# subset PharmacoSets to only relevant drugs
+qsave(sarcsets, file=file.path(out_dir, "sarcsets.qs"), nthread=getDTthreads())
+
+# drugs of interest

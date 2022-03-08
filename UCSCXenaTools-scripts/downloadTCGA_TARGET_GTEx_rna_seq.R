@@ -38,7 +38,7 @@ on.exit(options(ops))
 options(timeout=600)
 
 # Increase size of VROOM file buffer
-Sys.setenv("VROOM_CONNECTION_SIZE" = 10^7)
+Sys.setenv("VROOM_CONNECTION_SIZE" = 10^8)
 
 XenaGenerate(subset=XenaCohorts == cohort & Type == "clinicalMatrix") |>
     XenaQuery() |>
@@ -74,7 +74,7 @@ mData <- copy(mol_data[-probemap_idx])
 
 # assays
 for (i in seq_along(mData)) {
-    mData[[i]] <- as.matrix(mData[[i]], rownames="sample")
+    mData[[i]] <- as.matrix(mData[[i]], rownames="feature")
 }
 
 # metadata
@@ -83,6 +83,8 @@ metadata <- list(
     molecular_data=xd[XenaDatasets %in% datasets, ],
     sessionInfo=sessionInfo()
 )
+
+rm(mol_data, gc=TRUE)
 
 # experiments
 se_list <- vector("list", length(mData))

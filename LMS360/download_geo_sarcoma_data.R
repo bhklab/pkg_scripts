@@ -3,6 +3,7 @@ library(Biobase)
 library(SummarizedExperiment)
 library(data.table)
 library(qs)
+library(affy)
 
 # configure download options for this session
 ops <- options()
@@ -26,7 +27,7 @@ cdf <- gsub("_.*$", "", basename(brain_array[1]))
 library(cdf, character.only=TRUE)
 
 datasets <- c("GSE21122", "GSE21050")
-data_dir <- ".data"
+data_dir <- "local_data"
 
 # fetch Gencode v33 annotations from BHKLAB-Pachyderm/Annotations
 gencode_url <- "https://github.com/BHKLAB-Pachyderm/Annotations/raw/master/Gencode.v33.annotation.RData"
@@ -48,11 +49,12 @@ setkeyv(gene_annots, "gene_id")
 # Source: "http://www.affymetrix.com/Auth/analysis/downloads/na35/ivt/HG-U133A_2.na35.annot.csv.zip"
 # Note: can't download programatically due to account requirements for Affymetrix website
 # Note: these are not used, using gencode instead
-affy_probes <- fread(file.path(data_dir, "HG-U133A_2.na35.annot.csv"),
-    skip=25)  # first 25 lines are header
+# affy_probes <- fread(file.path(data_dir, "HG-U133A_2.na35.annot.csv"),
+#     skip=25)  # first 25 lines are header
 
 se_list <- vector("list", length(datasets)) |> setNames(datasets)
 for (ds in datasets) {
+    print(ds)
     eset <- getGEO(ds)
     # extract sample metadata
     pData <- phenoData(eset[[1]])

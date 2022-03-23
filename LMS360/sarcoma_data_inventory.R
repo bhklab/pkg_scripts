@@ -201,6 +201,16 @@ disease_by_dataset_tcga <- cellInfo_by_tcga_pset[,
 
 # ----- Clinical Data
 
-gse210 <- qread("local_data/GSE21050_RangedSummarizedExperiment.qs")
-gse211 <- qread("local_data/GSE211")
-tcga_target <-
+gse210 <- qread("local_data/GSE21050_RangedSummarizedExperiment.qs",
+    nthread=nthread)
+gse211 <- qread("local_data/GSE21122_RangedSummarizedExperiment.qs",
+    nthread=nthread)
+tcga_target <- qread("local_data/TCGA.TARGET.GTEx_mae.qs",
+    nthread=nthread)
+
+# extract and merge sample metadata
+gse210_colData <- as.data.table(colData(gse210))
+gse211_colData <- as.data.table(colData(gse211))
+tcga_target_colData <- as.data.table(colData(tcga_target))
+
+# select columns of interest, match column names

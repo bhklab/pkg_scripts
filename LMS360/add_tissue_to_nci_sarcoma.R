@@ -21,7 +21,7 @@ cInfo <- merge.data.table(sarc_cInfo, cellid_to_tissueid,
     by="cellid", all.x=TRUE)
 setcolorder(cInfo, c("rn", "cellid", "tissueid"))
 cellInfo(sarcsets$NCI_Sarcoma) <- as.data.frame(cInfo[, -"rn"],
-    rownames=cInfo[["rn"]])
+    row.names=cInfo[["rn"]])
 
 # write back to disk
 qsave(sarcsets, file="local_data/sarcsets.qs", nthread=nthread)

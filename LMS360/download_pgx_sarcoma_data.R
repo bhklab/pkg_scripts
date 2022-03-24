@@ -24,7 +24,9 @@ sarcoma_cells[, disease := gsub(".*; ", "", ncit_disease)]
 
 # remove mislabelled sarcomas based on discussion with Dr. Dimitrios Spentos
 exclude_diseases <- c("Gliosarcoma", "Pleural sarcomatoid mesothelioma",
-    "Uterine carcinosarcoma", "Thyroid gland sarcoma")
+    "Uterine carcinosarcoma", "Thyroid gland sarcoma",
+    "Ovarian clear cell adenocarcinoma", "Rhabdoid tumor of the kidney",
+    "Lung adenocarcinoma", NA_character_)
 
 has_exclude_diseases <- exclude_diseases %in% sarcoma_cells$disease
 if (!all(has_exclude_diseases)) warning("Disease not found: ",
@@ -33,7 +35,7 @@ if (!all(has_exclude_diseases)) warning("Disease not found: ",
 sarcoma_df <- sarcoma_cells[!(disease %in% exclude_diseases), ]
 
 # -- download the relevant PharmacoSets
-sarcoma_psets <- sarcoma_df[,
+sarcoma_psets <- sarcoma_df[!is.na(disease),
     na.omit(unique(unlist(tstrsplit(dataset_name, split="\\|"))))
 ]
 sarcoma_psets <- gsub("_", ".*", sarcoma_psets)  # fix to regex match psets
@@ -86,6 +88,21 @@ for (i in seq_along(sarcsets)) {
     rownames(cellInfo(sarcsets[[i]])) <- cellInfo(sarcsets[[i]])$cellid
 }
 
+# fix molecular data
+molecularProfilesSlot(sarcsets$NCI_Sarcoma)$rna <- as(
+    molecularProfilesSlot(sarcsets$NCI_Sarcoma)$rna,
+    "SummarizedExperiment"
+)
+
+# remove diseases flagged as not sarcoma
+cInfo <- as.data.table(cellInfo(sarcsets[["NCI_Sarcoma"]]))
+keep_cells <- cInfo[
+    !(cellosaurus.disease %in% exclude_diseases | is.na(cellosaurus.disease)),
+    unique(cellid)
+]
+sarcsets$NCI_Sarcoma <- subsetTo(sarcsets$NCI_Sarcoma, cells=keep_cells,
+    molecular.data.cells=keep_cells)
+
 qsave(sarcsets, file=file.path(out_dir, "sarcsets.qs"),
     nthread=nthread)
 
@@ -100,7 +117,7 @@ tcga_pgx_drugs <- tcga_pgx_drugs[1:9]
 fwrite(list(compound=tcga_pgx_drugs), file=file.path(out_dir,
     "tcga_pgx_drugs.csv"))
 
-sarcsets_tcga_drugs <- bplapply(test,
+sarcsets_tcga_drugs <- bplapply(sarcsets,
         FUN=\(x, keep_drugs) {
     drugs <- intersect(drugNames(x), keep_drugs)
     subsetTo(x, drugs=drugs)

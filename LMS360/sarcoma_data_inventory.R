@@ -3,9 +3,9 @@ library(qs)
 library(MultiAssayExperiment)
 library(PharmacoGx)
 library(BiocParallel)
-library(VennDiagram)
-library(UpSetR)
-library(ComplexUpset)
+#library(VennDiagram)
+#library(UpSetR)
+#library(ComplexUpset)
 
 ## ----- Script parameters
 
@@ -37,16 +37,16 @@ microsets_sub <- Map(\(x, y) { if (length(y)) subsetTo(x, cells=y, molecular.dat
 
 microsets_cellInfo <- rbindlist(lapply(microsets_sub, cellInfo), idcol="dataset",
     use.names=TRUE, fill=TRUE
-    )[, .SD, .SDcols=patterns("^cellid|^dataset|^cellosarus.*")]
+    )[, .SD, .SDcols=patterns("^cellid|^dataset|^cellosaurus.*")]
 
 unique_micro_cells_by_disease_dataset_long <- microsets_cellInfo[,
     .(nunique_cells=uniqueN(cellid)),
-    by=.(cellosarus.disease, dataset)
+    by=.(cellosaurus.disease, dataset)
 ][order(-nunique_cells)]
 
 unique_micro_cells_by_disease_dataset <- dcast(
     unique_micro_cells_by_disease_dataset_long,
-    cellosarus.disease ~ dataset,
+    cellosaurus.disease ~ dataset,
     value.var="nunique_cells",
     fill=0
 )
@@ -70,16 +70,16 @@ rnaseqsets_sub <- Map(\(x, y) { if (length(y)) subsetTo(x, cells=y, molecular.da
 
 rnaseqsets_cellInfo <- rbindlist(lapply(rnaseqsets_sub, cellInfo), idcol="dataset",
     use.names=TRUE, fill=TRUE
-    )[, .SD, .SDcols=patterns("^cellid|^dataset|^cellosarus.*")]
+    )[, .SD, .SDcols=patterns("^cellid|^dataset|^cellosaurus.*")]
 
 unique_rna_cells_by_disease_dataset_long <- rnaseqsets_cellInfo[,
     .(nunique_cells=uniqueN(cellid)),
-    by=.(cellosarus.disease, dataset)
+    by=.(cellosaurus.disease, dataset)
 ][order(-nunique_cells)]
 
 unique_rna_cells_by_disease_dataset <- dcast(
     unique_rna_cells_by_disease_dataset_long,
-    cellosarus.disease ~ dataset,
+    cellosaurus.disease ~ dataset,
     value.var="nunique_cells",
     fill=0
 )
@@ -97,9 +97,9 @@ sarcsets_sensInfo <- rbindlist(lapply(sarcsets, sensitivityInfo), idcol="dataset
 
 sarcsets_cellInfo <- rbindlist(lapply(sarcsets, FUN=cellInfo), idcol="dataset",
     use.names=TRUE, fill=TRUE
-    )[, .SD, .SDcols=patterns("^cellid|^dataset|^cellosarus.*")]
+    )[, .SD, .SDcols=patterns("^cellid|^dataset|^cellosaurus.*")]
 
-sarcsets_cellosaurus_disease <- unique(sarcsets_cellInfo[, .(cellid, cellosarus.disease)])
+sarcsets_cellosaurus_disease <- unique(sarcsets_cellInfo[, .(cellid, cellosaurus.disease)])
 sarcsets_cells_drugs_disease <- merge.data.table(
     sarcsets_sensInfo, sarcsets_cellosaurus_disease,
     by="cellid",
@@ -108,13 +108,13 @@ sarcsets_cells_drugs_disease <- merge.data.table(
 
 sarcsets_drugs_by_disease_long <- sarcsets_cells_drugs_disease[,
     .(ndrugs=uniqueN(drugid)),
-    by=.(dataset, cellosarus.disease)
+    by=.(dataset, cellosaurus.disease)
 ]
 sarcsets_drugs_by_disease <- dcast(sarcsets_drugs_by_disease_long,
-    cellosarus.disease ~ dataset,
+    cellosaurus.disease ~ dataset,
     value.var="ndrugs",
     fill=0
-)[!is.na(cellosarus.disease)]
+)[!is.na(cellosaurus.disease)]
 setorderv(sarcsets_drugs_by_disease,
     cols=unique(sarcsets_drugs_by_disease_long$dataset),
     -1L
@@ -131,7 +131,7 @@ fwrite(sarcsets_drugs_by_disease, file=file.path("local_data",
 # all molecular data
 cellInfo_by_pset <- rbindlist(lapply(sarcsets, FUN=cellInfo), idcol="dataset",
     use.names=TRUE, fill=TRUE
-    )[, .SD, .SDcols=patterns("^cellid|dataset|cellosarus.*")]
+    )[, .SD, .SDcols=patterns("^cellid|dataset|cellosaurus.*")]
 
 drugInfo_by_pset <- rbindlist(lapply(sarcsets, FUN=drugInfo), idcol="dataset",
     use.names=TRUE, fill=TRUE)[, .(dataset, drugid, inchikey)]
@@ -139,23 +139,23 @@ drugInfo_by_pset <- rbindlist(lapply(sarcsets, FUN=drugInfo), idcol="dataset",
 sarcsets_stats <- cellInfo_by_pset[,
     .(nsamples=length(cellid), nunique_cells=length(unique(cellid)),
         ndatasets=length(unique(dataset))),
-    by=cellosarus.disease
+    by=cellosaurus.disease
 ][order(-nsamples, -nunique_cells, -ndatasets)]
 
 sarcsets_sample_stats <- cellInfo_by_pset[,
     .(nsamples=length(cellid), nunique_cells=length(unique(cellid)),
-        nunique_disease=length(unique(cellosarus.disease))),
+        nunique_disease=length(unique(cellosaurus.disease))),
     by=dataset
 ]
 
 
 datasets_by_disease <- cellInfo_by_pset[,
     .(datasets=paste0(unique(dataset), collapse=";")),
-    by=cellosarus.disease
+    by=cellosaurus.disease
 ]
 
 disease_by_dataset <- cellInfo_by_pset[,
-    .(diseases=paste0(unique(cellosarus.disease), collapse=";")),
+    .(diseases=paste0(unique(cellosaurus.disease), collapse=";")),
     by=dataset
 ]
 
@@ -167,7 +167,7 @@ sarcsets_tcga_drugs <- qread("local_data/sarcsets_tcga_drugs.qs",
 
 cellInfo_by_tcga_pset <- rbindlist(lapply(sarcsets_tcga_drugs, FUN=cellInfo),
     idcol="dataset", use.names=TRUE, fill=TRUE
-)[, .SD, .SDcols=patterns("^cellid|dataset|cellosarus.*")]
+)[, .SD, .SDcols=patterns("^cellid|dataset|cellosaurus.*")]
 
 drugInfo_by_pset_tcga <- rbindlist(lapply(sarcsets_tcga_drugs, FUN=drugInfo),
     idcol="dataset", use.names=TRUE, fill=TRUE)[, .(dataset, drugid)]
@@ -180,27 +180,37 @@ drugs_by_dataset <- drugInfo_by_pset_tcga[,
 sarcsets_stats_tcga <- cellInfo_by_tcga_pset[,
     .(nsamples=length(cellid), nunique_cells=length(unique(cellid)),
         ndatasets=length(unique(dataset))),
-    by=cellosarus.disease
+    by=cellosaurus.disease
 ][order(-nsamples, -nunique_cells, -ndatasets)]
 
 sarcsets_sample_stats_tcga <- cellInfo_by_pset[,
     .(nsamples=length(cellid), nunique_cells=length(unique(cellid)),
-        nunique_disease=length(unique(cellosarus.disease))),
+        nunique_disease=length(unique(cellosaurus.disease))),
     by=dataset
 ]
 
 datasets_by_disease_tcga <- cellInfo_by_tcga_pset[,
     .(datasets=paste0(unique(dataset), collapse=";")),
-    by=cellosarus.disease
+    by=cellosaurus.disease
 ]
 
 disease_by_dataset_tcga <- cellInfo_by_tcga_pset[,
-    .(diseases=paste0(unique(cellosarus.disease), collapse=";")),
+    .(diseases=paste0(unique(cellosaurus.disease), collapse=";")),
     by=dataset
 ]
 
 # ----- Clinical Data
 
-gse210 <- qread("local_data/GSE21050_RangedSummarizedExperiment.qs")
-gse211 <- qread("local_data/GSE211")
-tcga_target <-
+gse210 <- qread("local_data/GSE21050_RangedSummarizedExperiment.qs",
+    nthread=nthread)
+gse211 <- qread("local_data/GSE21122_RangedSummarizedExperiment.qs",
+    nthread=nthread)
+tcga_target <- qread("local_data/TCGA.TARGET.GTEx_mae.qs",
+    nthread=nthread)
+
+# extract and merge sample metadata
+gse210_colData <- as.data.table(colData(gse210))
+gse211_colData <- as.data.table(colData(gse211))
+tcga_target_colData <- as.data.table(colData(tcga_target))
+
+# select columns of interest, match column names

@@ -26,7 +26,7 @@ for (i in seq_along(molecularProfilesSlot(NCI))) {
 
     ## TODO:: Implement mapping for mirna if possible?
     # Skip mirna
-    if (metadata(SE)$annotation == 'mirna') next
+    if (metadata(SE)$annotation == 'mirna') next()
 
     # -- 6.2 Try look-up with Symbols
     symbol <- as.character(rRanges$Gene.name)

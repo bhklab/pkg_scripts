@@ -95,8 +95,7 @@ for (a in assays) setkeyv(a, "ogKey")
 
 ## -- Coerce back to data.table of raw data
 aMap <- unique(nci_DT[, .(rowKey, colKey, ogKey)])
-setkeyv(aMap, c("rowKey", "colKey"))
-setindexv(aMap, "ogKey")
+setkeyv(aMap, c("rowKey", "colKey", "ogKey"))
 
 obj_ <- c(list(rData, cData), assays)
 # join everything with aMap
@@ -116,4 +115,3 @@ assayMap(dataMapperLT) <- assayMap_
 metadataMap(dataMapperLT) <- list(
     experiment_metadata=guess$metadata$mapped_columns
 )
-

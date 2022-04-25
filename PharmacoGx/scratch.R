@@ -14,7 +14,7 @@ CCLE_treat <- subsetByTreatment(CCLE, treatments)
 features <- fNames(CCLE, 'rna')[1:5]
 CCLE_feat <- subsetByFeature(CCLE, features, 'rna')
 
-samples <- cellNames(CCLE)[1:5]
+samples <- sampleNames(CCLE)[1:5]
 CCLE_samp <- subsetBySample(CCLE, samples)
 
 LT <- CoreGx:::.sensitivityToLongTable(CCLE)

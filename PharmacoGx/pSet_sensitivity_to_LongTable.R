@@ -48,8 +48,8 @@ gDRutils::reset_env_identifiers()
 default_ids <- gDRutils::get_env_identifiers()
 ## TODO:: helper function to guess identifier mappings
 pgx_to_gdr_ids <- list(
-    cellline="cellid",
-    cellline_name="cellid",
+    cellline="sampleid",
+    cellline_name="sampleid",
     cellline_ref_div_time="doublingtime",
     drug="drug1id",
     drugname="drug1id",
@@ -112,20 +112,20 @@ se <- create_SE(
 #' @param TRE `LongTable` to convert to gDR `SummarizedExperiment` format.
 #' @param assay_names `character()` Names to rename the assays to. These
 #'   are assumed to be in the same order as `assayNames(TRE)`.
-#' 
-#' @return `SummarizedExperiment` object with all assay from `TRE` as 
+#'
+#' @return `SummarizedExperiment` object with all assay from `TRE` as
 #'   `BumpyMatrix`es.
-#' 
+#'
 #' @importFrom data.table setnames
 #' @importFrom SummarizedExperiment SummarizedExperiment
 #' @importMethodsFrom CoreGx rowData colData assayNames
 .trExperimentToSummarizedExperiment <- function(TRE, assay_names) {
-    assay_list <- lapply(assayNames(TRE), FUN=.assayToBumpyMatrix, 
-        TRE=TRE, rows='drug1id', cols='cellid')
-    if (!missing(assay_names) && length(assay_names) == length(assayNames(TRE))) 
+    assay_list <- lapply(assayNames(TRE), FUN=.assayToBumpyMatrix,
+        TRE=TRE, rows='drug1id', cols='sampleid')
+    if (!missing(assay_names) && length(assay_names) == length(assayNames(TRE)))
         names(assay_list) <- assay_names
     SummarizedExperiment(
-        assays=assay_list, rowData=rowData(TRE), colData=colData(TRE), 
+        assays=assay_list, rowData=rowData(TRE), colData=colData(TRE),
             metadata=c(metadata(TRE), list(.intern=as.list(getIntern(TRE))))
     )
 }

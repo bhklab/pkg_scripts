@@ -12,7 +12,7 @@ LT <- pSet |>
 pSet2 <- PharmacoSet2(
     name=name(pSet),
     treatment=drugInfo(pSet),
-    sample=cellInfo(pSet),
+    sample=sampleInfo(pSet),
     molecularProfiles=MAE,
     treatmentResponse=LT,
     curation=curation(pSet)

@@ -110,9 +110,13 @@ rm(setdiff(ls(), c("dataMapperLT", "guess", "assayMap_"))); gc()
 
 ## -- metaConstruct works
 ## FIXME:: Why is this assignment slow?
-rowDataMap(dataMapperLT) <- guess$rowDataMap
-colDataMap(dataMapperLT) <- guess$colDataMap
-assayMap(dataMapperLT) <- assayMap_
-metadataMap(dataMapperLT) <- list(
-    experiment_metadata=guess$metadata$mapped_columns
-)
+bench::mark({ rowDataMap(dataMapperLT) <- guess$rowDataMap })
+bench::mark({ colDataMap(dataMapperLT) <- guess$colDataMap })
+bench::mark({ assayMap(dataMapperLT) <- assayMap_ })
+bench::mark({
+    metadataMap(dataMapperLT) <- list(
+        experiment_metadata=guess$metadata$mapped_columns
+    )
+})
+
+bench::mark({ lt <- metaConstruct(dataMapperLT) })

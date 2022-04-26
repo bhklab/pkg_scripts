@@ -106,6 +106,7 @@ for (o_ in obj_) setkeyv(o_, c("ogKey", "rowKey", "colKey"))
 dt_ <- Reduce(f=merge, obj_)
 dt_ <- cbind(dt_, as.data.table(metadata_))
 
+rm(setdiff(ls(), c("dataMapperLT", "guess", "assayMap_"))); gc()
 
 ## -- metaConstruct works
 ## FIXME:: Why is this assignment slow?

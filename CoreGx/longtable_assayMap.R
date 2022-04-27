@@ -1,6 +1,6 @@
 library(CoreGx)
-library(data.table)
 library(BiocParallel)
+
 
 ## ---- NCI-ALMANAC
 
@@ -109,13 +109,13 @@ dt_ <- cbind(dt_, as.data.table(metadata_))
 
 ## -- metaConstruct works
 ## FIXME:: Why is this assignment slow?
-bench::mark({ rowDataMap(dataMapperLT) <- guess$rowDataMap })
-bench::mark({ colDataMap(dataMapperLT) <- guess$colDataMap })
-bench::mark({ assayMap(dataMapperLT) <- assayMap_ })
-bench::mark({
+bench::system_time({ rowDataMap(dataMapperLT) <- guess$rowDataMap })
+bench::system_time({ colDataMap(dataMapperLT) <- guess$colDataMap })
+bench::system_time({ assayMap(dataMapperLT) <- assayMap_ })
+bench::system_time({
     metadataMap(dataMapperLT) <- list(
         experiment_metadata=guess$metadata$mapped_columns
     )
 })
 
-bench::mark({ lt <- metaConstruct(dataMapperLT) })
+bench::system_time({ lt <- metaConstruct(dataMapperLT) })

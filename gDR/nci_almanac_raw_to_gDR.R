@@ -41,7 +41,6 @@ nci <- melt.data.table(nci_DT,
 
 # add duration data
 nci[, duration := 2]
-nci[condition == "TZVALUE", duration := 0]
 
 # format treated vs untreated label
 nci[condition == "TESTVALUE", condition := "treated"]
@@ -66,10 +65,12 @@ gdr_names <- c(
 setnames(nci, names(gdr_names), gdr_names)
 
 nci_small <- nci[
-    clid %in% unique(clid)[1:5] & DrugName %in% unique(DrugName)[1:5],
+    clid %in% unique(clid)[1:5] & 
+        DrugName %in% unique(DrugName)[1:5] & 
+        DrugName_2 %in% unique(DrugName_2)[1:5],
 ]
 
 # unmatch controls to see if the create_SE function works
-nci_small[condition == "untreated", c("DrugName", "DrugName_2") := "vehicle"]
+nci_small[condition == "untreated", c("DrugName", "DrugName_2") := "untreated"]
 
 se <- create_SE(nci_small, nested_identifiers="Plate")

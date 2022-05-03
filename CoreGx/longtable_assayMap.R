@@ -1,6 +1,6 @@
 library(CoreGx)
-library(data.table)
 library(BiocParallel)
+
 
 ## ---- NCI-ALMANAC
 
@@ -95,8 +95,7 @@ for (a in assays) setkeyv(a, "ogKey")
 
 ## -- Coerce back to data.table of raw data
 aMap <- unique(nci_DT[, .(rowKey, colKey, ogKey)])
-setkeyv(aMap, c("rowKey", "colKey"))
-setindexv(aMap, "ogKey")
+setkeyv(aMap, c("rowKey", "colKey", "ogKey"))
 
 obj_ <- c(list(rData, cData), assays)
 # join everything with aMap
@@ -107,13 +106,17 @@ for (o_ in obj_) setkeyv(o_, c("ogKey", "rowKey", "colKey"))
 dt_ <- Reduce(f=merge, obj_)
 dt_ <- cbind(dt_, as.data.table(metadata_))
 
+rm(setdiff(ls(), c("dataMapperLT", "guess", "assayMap_"))); gc()
 
 ## -- metaConstruct works
 ## FIXME:: Why is this assignment slow?
-rowDataMap(dataMapperLT) <- guess$rowDataMap
-colDataMap(dataMapperLT) <- guess$colDataMap
-assayMap(dataMapperLT) <- assayMap_
-metadataMap(dataMapperLT) <- list(
-    experiment_metadata=guess$metadata$mapped_columns
-)
+bench::system_time({ rowDataMap(dataMapperLT) <- guess$rowDataMap })
+bench::system_time({ colDataMap(dataMapperLT) <- guess$colDataMap })
+bench::system_time({ assayMap(dataMapperLT) <- assayMap_ })
+bench::system_time({
+    metadataMap(dataMapperLT) <- list(
+        experiment_metadata=guess$metadata$mapped_columns
+    )
+})
 
+bench::system_time({ lt <- metaConstruct(dataMapperLT) })

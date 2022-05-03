@@ -14,7 +14,7 @@ CCLE_SE <- qread(file.path('local_data', 'CCLE_gDR.qs'))
 pgx_identifiers <- c(
     drug="drug1id",
     concentration="drug1dose",
-    cellline="cellid"
+    cellline="sampleid"
 )
 for (i in seq_along(pgx_identifiers)) {
     gDRutils::set_env_identifier(

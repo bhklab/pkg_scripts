@@ -9,7 +9,6 @@ library(affy)
 ops <- options()
 options(timeout=1e6)
 on.exit(options(ops))
-
 # install appropriate brain array annotations for array platform
 brain_array_urls <- function(array, species="hs", annotation="ensg", version="25.0.0") {
     ## FIXME:: make robust to missing arguments

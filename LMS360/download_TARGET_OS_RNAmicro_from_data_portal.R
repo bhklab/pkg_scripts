@@ -5,10 +5,10 @@ library(rvest)
 library(qs)
 library(readxl)
 
-data_dir <- "local_data/TARGET_OS"
+data_dir <- "local_data/TARGET_OS/gene_expression_array"
 metadata_dir <- "metadata"
 
-url <- "https://target-data.nci.nih.gov/Public/OS/mRNA-seq"
+url <- "https://target-data.nci.nih.gov/Public/OS/gene_expression_array"
 
 grep_directory_names <- function(x) {
     grep(".*/$", x, value=TRUE)
@@ -38,7 +38,7 @@ get_remote_table <- function(url) {
 #'   to scrape from `url`. This should be the file extension only, with no dot.
 #'   It could also be a valid regex expression. Please note that all values will
 #'   be appended with "$" to match on the end of files and collapsed together
-#'   witht he "|" regex operator. The default matches any alphanumeric file
+#'   with the "|" regex operator. The default matches any alphanumeric file
 #'   extensions between two and five character long.
 #'
 #' @return `character()` vector of remote file URLs to download from.
@@ -85,53 +85,42 @@ list.files(data_dir)
 metadata_path <- list.files(file.path(data_dir, "METADATA"), full.names=TRUE)[3]
 col_data <- fread(metadata_path)
 
-# -- Read in gene expression
+# -- Read in gene expression array
 gene_expr_files <- list.files(
-    file.path(data_dir, "L3", "expression", "NCI-Meltzer"),
+    file.path(data_dir, "L3"),
     pattern="gene",
     full.names=TRUE
 )
 names(gene_expr_files) <- gene_expr_files
-gene_expr <- lapply(gene_expr_files, FUN=fread)
-gene_expr_long <- rbindlist(gene_expr, idcol="file")
+gene_expr <- lapply(gene_expr_files, FUN=fread)[[1]]
 
-# -- Parse the long table into a gene by sample matrix
-gene_expr_long[, file := basename(file)]
-setnames(gene_expr_long, "Name", "gene_id")
-gene_expr_wide <- dcast(gene_expr_long, gene_id ~ file, value.var="TPM")
+# -- Parse the gene names into valid regex queries
+gene_expr[, probeset_id := NULL]
+gene_expr[,
+    gene_id := unlist(lapply(gene_assignment_final,
+        FUN=\(x) paste0(unique(strsplit(x, " // ")[[1]]), collapse="|")))
+]
 
-expr_mat <- as.matrix(gene_expr_wide[, -c("gene_id")])
-rownames(expr_mat) <- gene_expr_wide$gene_id
+expr_mat <- as.matrix(gene_expr[, -c("gene_id", "gene_assignment_final")])
+rownames(expr_mat) <- gene_expr$gene_id
 
-# -- Subset the sampe metadata to only included samples
-setkeyv(col_data, "Derived Array Data File")
+# -- Subset the sample metadata to only included samples
+setkeyv(col_data, "Array Data File")
 subColData <- col_data[colnames(expr_mat), ]
-subColData <- subColData[, first(.SD), by=`Derived Array Data File`]
+subColData <- subColData[, first(.SD), by=`Array Data File`]
 
 # -- Make SummarizedExperiment
-target_os <- SummarizedExperiment(assays=list(tpm=expr_mat), colData=subColData)
-
-# -- Download clinical metadata
-url <- "https://target-data.nci.nih.gov/Public/OS/clinical/harmonized"
-remote_files <- find_remote_files_recursive(url)
-clinical_path <- file.path(data_dir, "clinical")
-local_files <- gsub(url, clincal_path, remote_files)
-
-for (i in seq_along(remote_files)) {
-    if (!dir.exitst(dirname(local_files[i])))
-        dir.create(dirname(local_files[i]), recursive=TRUE)
-    downloader::download(remote_files[i], destfile=local_files[i])
-}
+target_os <- SummarizedExperiment(assays=list(rma=expr_mat), colData=subColData)
 
 # -- Read and merge clinical metadata
+clinical_path <- file.path("local_data", "TARGET_OS", "clinical")
 clinical_files <- list.files(clinical_path, pattern="xlsx", full.names=TRUE)
 clinical_meta <- lapply(clinical_files, FUN=read_excel)
 
 metadata(target_os)$clinical_data_elements <- as.data.frame(clinical_meta[[1]])
 
 # match the colnames to TARGET USI
-colnames(target_os) <- gsub("-[^-]*-[^-]*\\.gene.quantification.txt", "",
-    colnames(target_os))
+colnames(target_os) <- colData(target_os)$`Source Name`
 colData(target_os)$`TARGET USI` <- colnames(target_os)
 
 clinical_dates <- gsub(".*_|.xlsx", "", clinical_files[-1])

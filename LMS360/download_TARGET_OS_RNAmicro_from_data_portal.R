@@ -233,13 +233,29 @@ setnames(rdata, "gene_assignment_final", "target_transcript_id")
 #   if there are none, select the first occurence
 rdata <- rdata[,
     if (.N > 1)
-        .SD[, if (any(!is.na(gene_id))) .SD[!is.na(gene_id), ][1, ] else first(.SD)]
+        .SD[, if (any(!is.na(gene_name))) .SD[!is.na(gene_name), ][1, ] else first(.SD)]
     else .SD,
     by=probeset_id
 ]
 
+# Sanity check that the gene symbols match the original TARGET annotations
+mismatches <- list()
+num_valid_genes <- nrow(rdata[!is.na(gene_name)])
+pb <- progress_bar$new(total=num_valid_genes)
+for (i in seq_len(num_valid_genes)) {
+    pb$tick()
+    row_res <- rdata[!is.na(gene_name)][
+        i,
+        if (target_transcript_id %like% gene_name) TRUE else .SD
+    ]
+    if (!isTRUE(row_res)) {
+        mismatches <- append(mismatches, list(row_res))
+    }
+}
+
 # Assign the feature annotations back to the object
 setkeyv(rdata, "probeset_id")
-rowData(target_os) <- rdata[probeset_id %in% ]
+rowData(target_os) <- rdata[rownames(target_os), ]
 
+# -- Save file to disk
 qsave(target_os, file=file.path(data_dir, "target_os_micro_se.qs"), nthread=8)

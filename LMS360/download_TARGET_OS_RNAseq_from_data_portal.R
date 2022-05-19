@@ -4,34 +4,12 @@ library(downloader)
 library(rvest)
 library(qs)
 library(readxl)
-library(BiocParallel)
-library(progress)
 
-# get annotation package for Human Exon 1.0 ST transcript clusters
-# NOTE: probset_id in the TARGET OS annotations is actually transcript cluster id!
-if (!require("huex10sttranscriptcluster.db"))
-    BiocManager::install("huex10sttranscriptcluster.db")
-library(huex10sttranscriptcluster.db)
-
-# load array annotation datasets
-huex10sttranscriptcluster()
-probeset_to_ensembl <- as.data.table(huex10sttranscriptclusterENSEMBL)
-probeset_to_entrez <- as.data.table(huex10sttranscriptclusterENTREZID)
-
-# paste together ids for probesets mapping to multiple genes
-## NOTE: entrez tables have no multimaps
-probeset_to_ensembl_no_dups <- probeset_to_ensembl[,
-    .(ensembl_id=paste0(ensembl_id, collapse="|")),
-    by=probe_id
-]
-
-# -- script configuration parameters
-data_dir <- "local_data/TARGET_OS/gene_expression_array"
+data_dir <- "local_data/TARGET_OS/rnaseq"
 metadata_dir <- "metadata"
 
-url <- "https://target-data.nci.nih.gov/Public/OS/gene_expression_array"
+url <- "https://target-data.nci.nih.gov/Public/OS/mRNA-seq"
 
-# -- helper function definitions
 grep_directory_names <- function(x) {
     grep(".*/$", x, value=TRUE)
 }
@@ -98,56 +76,62 @@ file_paths <- gsub(url, data_dir, remote_files)
 for (i in seq_along(remote_files)) {
     if (!dir.exists(dirname(file_paths[i])))
         dir.create(dirname(file_paths[i]), recursive=TRUE)
-    if (!file.exists(file_paths[i]))
-        downloader::download(remote_files[i], destfile=file_paths[i])
+    downloader::download(remote_files[i], destfile=file_paths[i])
 }
+
 
 # -- Read in the sample metadata
 list.files(data_dir)
 metadata_path <- list.files(file.path(data_dir, "METADATA"), full.names=TRUE)[3]
 col_data <- fread(metadata_path)
 
-# -- Read in gene expression array
+# -- Read in gene expression
 gene_expr_files <- list.files(
-    file.path(data_dir, "L3"),
+    file.path(data_dir, "L3", "expression", "NCI-Meltzer"),
     pattern="gene",
     full.names=TRUE
 )
 names(gene_expr_files) <- gene_expr_files
-gene_expr <- lapply(gene_expr_files, FUN=fread)[[1]]
+gene_expr <- lapply(gene_expr_files, FUN=fread)
+gene_expr_long <- rbindlist(gene_expr, idcol="file")
 
-# -- Map the probset_id column to associated ensembl genes
+# -- Parse the long table into a gene by sample matrix
+gene_expr_long[, file := basename(file)]
+setnames(gene_expr_long, "Name", "gene_id")
+gene_expr_wide <- dcast(gene_expr_long, gene_id ~ file, value.var="TPM")
 
-# -- Parse the gene names into valid regex queries
-gene_expr[,
-    gene_id := unlist(lapply(gene_assignment_final,
-        FUN=\(x) paste0(unique(strsplit(x, " // ")[[1]]), collapse="|")))
-]
+expr_mat <- as.matrix(gene_expr_wide[, -c("gene_id")])
+rownames(expr_mat) <- gene_expr_wide$gene_id
 
-expr_mat <- as.matrix(gene_expr[, -c("gene_id", "gene_assignment_final")])
-rownames(expr_mat) <- gene_expr$probeset_id
-
-# -- Subset the sample metadata to only included samples
-setkeyv(col_data, "Array Data File")
+# -- Subset the sampe metadata to only included samples
+setkeyv(col_data, "Derived Array Data File")
 subColData <- col_data[colnames(expr_mat), ]
-subColData <- subColData[, first(.SD), by=`Array Data File`]
+subColData <- subColData[, first(.SD), by=`Derived Array Data File`]
 
 # -- Make SummarizedExperiment
-target_os <- SummarizedExperiment(
-    assays=list(rma=expr_mat),
-    colData=subColData,
-    rowData=gene_expr[, .SD, .SDcols=!patterns(".CEL")]
-)
+target_os <- SummarizedExperiment(assays=list(tpm=expr_mat), colData=subColData)
+
+# -- Download clinical metadata
+url <- "https://target-data.nci.nih.gov/Public/OS/clinical/harmonized"
+remote_files <- find_remote_files_recursive(url)
+clinical_path <- file.path("local_data", "TARGET_OS", "clinical")
+local_files <- gsub(url, clincal_path, remote_files)
+
+for (i in seq_along(remote_files)) {
+    if (!dir.exitst(dirname(local_files[i])))
+        dir.create(dirname(local_files[i]), recursive=TRUE)
+    downloader::download(remote_files[i], destfile=local_files[i])
+}
 
 # -- Read and merge clinical metadata
-clinical_path <- file.path("local_data", "TARGET_OS", "clinical")
 clinical_files <- list.files(clinical_path, pattern="xlsx", full.names=TRUE)
 clinical_meta <- lapply(clinical_files, FUN=read_excel)
 
 metadata(target_os)$clinical_data_elements <- as.data.frame(clinical_meta[[1]])
 
 # match the colnames to TARGET USI
-colnames(target_os) <- colData(target_os)$`Source Name`
+colnames(target_os) <- gsub("-[^-]*-[^-]*\\.gene.quantification.txt", "",
+    colnames(target_os))
 colData(target_os)$`TARGET USI` <- colnames(target_os)
 
 clinical_dates <- gsub(".*_|.xlsx", "", clinical_files[-1])
@@ -169,7 +153,6 @@ colData <- merge(colData, clinical_meta, by="TARGET USI", all.x=TRUE)
 colData(target_os) <- DataFrame(colData, check.names=FALSE)
 colnames(target_os) <- colData(target_os)$`TARGET USI`
 
-
 # -- Add gene annotations to rowData
 
 # fetch Gencode v33 annotations from BHKLAB-Pachyderm/Annotations
@@ -183,63 +166,14 @@ tx_annots <- gencode_annots$features_transcript
 
 # clean up gene_ids to match array
 setDT(gene_annots)
-gene_annots[, gene_id_no_ver := gsub("\\..*$", "", gene_id)]
-setnames(probeset_to_ensembl_no_dups,  # clean up names to indicate source of annotation
-    c("probe_id", "ensembl_id"),
-    c("probeset_id", "huex10sttranscriptcluster.ensembl_id")
-)
-probeset_to_gencode <- merge.data.table(
-    probeset_to_ensembl_no_dups,
-    gene_annots,
-    by.x="huex10sttranscriptcluster.ensembl_id",
-    by.y="gene_id_no_ver",
-    all.x=TRUE
-)
-# Add the multimapped genes as well
-multi_gene_patterns <- probeset_to_ensembl_no_dups[
-    huex10sttranscriptcluster.ensembl_id %like% "\\|",
-][["huex10sttranscriptcluster.ensembl_id"]]
-multi_gene_matches <- vector("list", length(multi_gene_patterns)) |>
-    setNames(multi_gene_patterns)
-pb <- progress_bar$new(total=length(multi_gene_matches))
-for (pattern in multi_gene_patterns) {
-    pb$tick()
-    multi_gene_matches[[pattern]] <- gene_annots[
-        gene_id_no_ver %like% pattern,
-    ]
-}
-multi_gene_dt <- rbindlist(multi_gene_matches, idcol=TRUE)
-# select only the first gene where multimapping occurs
-multi_gene_no_multi <- multi_gene_dt[, first(.SD), by=.id]
-multi_gene_mapped <- merge.data.table(
-    probeset_to_ensembl_no_dups,
-    multi_gene_no_multi,
-    by.x="huex10sttranscriptcluster.ensembl_id",
-    by.y=".id"
-)
-# Merge clean mapped with multimapped gencode annotations
-probeset_to_gencode <- rbind(
-    probeset_to_gencode,
-    multi_gene_mapped[, colnames(probeset_to_gencode), with=FALSE]
-)
-
-# Attach annotations to rowData of the TARGET OS SummarizedExperiment
-rdata <- as.data.table(rowData(target_os))[, gene_id := NULL]
-rdata[, probeset_id := as.character(probeset_id)]
-rdata <- merge.data.table(rdata, probeset_to_gencode, by="probeset_id",
-    all.x=TRUE, sort=FALSE)
-setnames(rdata, "gene_assignment_final", "target_transcript_id")
-# Drop duplicated probeset ids by selecting those with valid gene_ids or
-#   if there are none, select the first occurence
-rdata <- rdata[,
-    if (.N > 1)
-        .SD[, if (any(!is.na(gene_id))) .SD[!is.na(gene_id), ][1, ] else first(.SD)]
-    else .SD,
-    by=probeset_id
+gene_annots[,
+    c("gene_id_versioned", "gene_id") := .(gene_id, gsub("\\.*$", "", gene_id,))
 ]
+setkeyv(gene_annots, "gene_id")
 
-# Assign the feature annotations back to the object
-setkeyv(rdata, "probeset_id")
-rowData(target_os) <- rdata[probeset_id %in% ]
+rdata <- gene_annots[gsub("\\..*$", "", rownames(target_os)), ]
+rowData(target_os) <- rdata[!duplicated(gene_id), ]  # drop duplicated gene ids, which occur due to genes on both the X and Y chromosome
+rowData(target_os)$target_gene_id <- rownames(target_os)
+rownames(target_os) <- rowData(target_os)$gene_id
 
-qsave(target_os, file=file.path(data_dir, "target_os_micro_se.qs"), nthread=8)
+qsave(target_os, file=file.path(data_dir, "target_os_rnaseq_se.qs"), nthread=8)

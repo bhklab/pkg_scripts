@@ -233,7 +233,7 @@ setnames(rdata, "gene_assignment_final", "target_transcript_id")
 #   if there are none, select the first occurence
 rdata <- rdata[,
     if (.N > 1)
-        .SD[, if (any(!is.na(gene_name))) .SD[!is.na(gene_name), ][1, ] else first(.SD)]
+        .SD[, if (any(!is.na(gene_name))) .SD[!is.na(gene_name), ] else first(.SD)]
     else .SD,
     by=probeset_id
 ]

@@ -123,11 +123,6 @@ setorderv(sarcsets_drugs_by_disease,
 fwrite(sarcsets_drugs_by_disease, file=file.path("local_data",
     "sarcsets_unique_drugs_by_disease_dataset.csv"))
 
-
-
-
-
-
 # all molecular data
 cellInfo_by_pset <- rbindlist(lapply(sarcsets, FUN=cellInfo), idcol="dataset",
     use.names=TRUE, fill=TRUE
@@ -208,9 +203,24 @@ gse211 <- qread("local_data/GSE21122_RangedSummarizedExperiment.qs",
 tcga_target <- qread("local_data/TCGA.TARGET.GTEx_mae.qs",
     nthread=nthread)
 
+# subset to tcga_target
+tcga_target_keep_samples <- rownames(subset(
+    colData(tcga_target[[1]]),
+    `detailed_category` %ilike% "sarcoma"
+))
+tcga_target_se <- tcga_target[[1]][, tcga_target_keep_samples]
+
+sarcpatients <- list(gse210=gse210, gse211=gse211, tcga_target_sarcoma=tcga_target_se)
+
 # extract and merge sample metadata
-gse210_colData <- as.data.table(colData(gse210))
-gse211_colData <- as.data.table(colData(gse211))
-tcga_target_colData <- as.data.table(colData(tcga_target))
+colDataL <- lapply(sarcpatients, \(x) as(colData(x), "data.frame"))
+for (df_ in colDataL) setDT(df_)
+colDataDT <- rbindlist(colDataL, use.names=TRUE, fill=TRUE, idcol="dataset")
+
+# merge diagnoses into a single column
+colDataDT[,
+    diagnosis := fifelse(is.na(detailed_category),
+        `diagnosis.ch1`, detailed_category)
+]
 
 # select columns of interest, match column names

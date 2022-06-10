@@ -16,16 +16,20 @@ brain_array_urls <- function(array, species="hs", annotation="ensg", version="25
         "/", c("", "", "pd."), array, c("", "", "."), species, c("", "", "."),
         annotation, c("cdf", "probe", ""), "_", version, ".tar.gz")
 }
-array <- "hgu133a"
-brain_array <- brain_array_urls(array)
-for (pkg in brain_array) {
-    install.packages(pkg, type="src", repos=NULL)
+arrays <- c("hgu133a", "hgu133plus2")
+brain_array <- vapply(arrays, brain_array_urls, character(3))
+for (i in seq_len(ncol(brain_array))) {
+    for (pkg in brain_array[, i]) {
+        if (!require(pkg)) install.packages(pkg, type="src", repos=NULL)
+    }
 }
 
-cdf <- gsub("_.*$", "", basename(brain_array[1]))
-library(cdf, character.only=TRUE)
+cdfs <- gsub("\\_.*$", "", basename(grep(pattern="cdf\\_", brain_array, value=TRUE)))
+for (cdf in cdfs) library(cdf, charater.only=TRUE)
 
 datasets <- c("GSE21122", "GSE21050")
+# match the CDF to the dataset
+names(cdfs) <- datasets
 data_dir <- "local_data"
 
 # fetch Gencode v33 annotations from BHKLAB-Pachyderm/Annotations
@@ -43,13 +47,6 @@ gene_annots[,
     c("gene_id_versioned", "gene_id") := .(gene_id, gsub("\\..*$", "", gene_id,))
 ]
 setkeyv(gene_annots, "gene_id")
-
-# get most recent Affymetrix probe annotations for the HG-U133A array
-# Source: "http://www.affymetrix.com/Auth/analysis/downloads/na35/ivt/HG-U133A_2.na35.annot.csv.zip"
-# Note: can't download programatically due to account requirements for Affymetrix website
-# Note: these are not used, using gencode instead
-# affy_probes <- fread(file.path(data_dir, "HG-U133A_2.na35.annot.csv"),
-#     skip=25)  # first 25 lines are header
 
 se_list <- vector("list", length(datasets)) |> setNames(datasets)
 for (ds in datasets) {
@@ -70,7 +67,7 @@ for (ds in datasets) {
     for (f in cel_files_gz) GEOquery::gunzip(f, overwrite=TRUE)
     cel_files <- list.files(dataset_dir, pattern=".*CEL$",
         full.names=TRUE)
-    rma_eset <- affy::justRMA(filenames=cel_files, cdfname=cdf)
+    rma_eset <- affy::justRMA(filenames=cel_files, cdfname=cdfs[ds])
     # drop control probes
     rma_eset <- rma_eset[!grepl("AFFX", rownames(rma_eset)), ]
     # format ENSG IDs

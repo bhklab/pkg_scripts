@@ -5,6 +5,13 @@ library(data.table)
 library(qs)
 library(affy)
 
+# work around for affy pthread error
+devtools::install_github(
+    'bmbolstad/preprocessCore',
+    dependencies = T, upgrade = 'always',
+    configure.args = '--disable-threading'
+)
+
 # configure download options for this session
 ops <- options()
 options(timeout=1e6)
@@ -25,12 +32,12 @@ for (i in seq_len(ncol(brain_array))) {
 }
 
 cdfs <- gsub("\\_.*$", "", basename(grep(pattern="cdf\\_", brain_array, value=TRUE)))
-for (cdf in cdfs) library(cdf, charater.only=TRUE)
+for (cdf in cdfs) library(cdf, character.only=TRUE)
 
 datasets <- c("GSE21122", "GSE21050")
 # match the CDF to the dataset
 names(cdfs) <- datasets
-data_dir <- "local_data"
+data_dir <- "tmp"
 
 # fetch Gencode v33 annotations from BHKLAB-Pachyderm/Annotations
 gencode_url <- "https://github.com/BHKLAB-Pachyderm/Annotations/raw/master/Gencode.v33.annotation.RData"
@@ -67,7 +74,7 @@ for (ds in datasets) {
     for (f in cel_files_gz) GEOquery::gunzip(f, overwrite=TRUE)
     cel_files <- list.files(dataset_dir, pattern=".*CEL$",
         full.names=TRUE)
-    rma_eset <- affy::justRMA(filenames=cel_files, cdfname=cdfs[ds])
+    rma_eset <- affy::justRMA(filenames=cel_files, cdfname=unname(cdfs[ds]))
     # drop control probes
     rma_eset <- rma_eset[!grepl("AFFX", rownames(rma_eset)), ]
     # format ENSG IDs
@@ -91,7 +98,9 @@ for (ds in datasets) {
 # Save datasets to disk
 for (ds in names(se_list)) {
     qsave(se_list[[ds]],
-        file=file.path(data_dir, paste0(ds, "_", class(se_list[[ds]])[1], ".qs")),
+        file=file.path(data_dir,
+            paste0(ds, "_", class(se_list[[ds]])[1], "_", today(), ".qs")
+        ),
         nthread=getDTthreads()
     )
 }

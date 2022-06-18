@@ -61,7 +61,7 @@ setcolorder(combo_profiles, c("treatment1id", "treatment2id", "sampleid"))
 # -- predict viability for each drug in our combination
 # fix the scale of E_inf to be a proportion instead of a percent
 combo_profiles[,
-    c("E_inf_1", "E_inf_2") := .(E_inf_1/100, E_inf_2/100)
+    c("E_inf_1", "E_inf_2") := .(E_inf_1 / 100, E_inf_2 / 100)
 ]
 # predict viability at the combo doses from the Hill curves fit to monotherapy data
 combo_profiles[,
@@ -92,15 +92,15 @@ combo_profiles |>
             )
         ),
         ZIP={
-            dose_ratio1 <- (treatment1dose / EC50_1)^HS_1
-            dose_ratio2 <- (treatment2dose / EC50_2)^HS_2
-            ZIP1 <- dose_ratio1 / (1 + dose_ratio1)
-            ZIP2 <- dose_ratio2 / (1 + dose_ratio2)
+            dose_ratio1 <- (treatment1dose / EC50_1)
+            dose_ratio2 <- (treatment2dose / EC50_2)
+            ZIP1 <- dose_ratio1^HS_1 / (1 + dose_ratio1^HS_1)
+            ZIP2 <- dose_ratio2^HS_2 / (1 + dose_ratio2^HS_2)
             ZIP1 + ZIP2 - (ZIP1 * ZIP2)
         },
         viability_1=viability_1,
         viability_2=viability_2,
-        viability=viability/100,
+        viability=viability / 100,
         by=c("treatment1id", "treatment2id", "treatment1dose", "treatment2dose", "sampleid")
     ) -> combo_profiles1
 

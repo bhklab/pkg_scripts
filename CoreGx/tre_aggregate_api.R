@@ -6,7 +6,9 @@ sens <- tre$sensitivity[, .SD, .SDcols=c(idCols(tre), "viability")]
 
 # -- Parsing formulas
 fx <- cbind(drug1dose, drug2dose, viability) ~ drug1id + drug2id + cellid
-agg <- aggregate(fx, sens, FUN=mean)
+bench::system_time({
+    aggs <- aggregate(fx, sens, FUN=mean)
+})
 
 
 

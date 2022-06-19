@@ -91,12 +91,19 @@ combo_profiles |>
                 EC50_2 * ((1 - viability_2) / (viability_2 - E_inf_2))^(1 / HS_2)
             )
         ),
-        ZIP={
+        ZIP_v={
+            dose_ratio1 <- (treatment1dose / EC50_1)
+            dose_ratio2 <- (treatment2dose / EC50_2)
+            ZIP1 <- 1 / (1 + dose_ratio1^HS_1)
+            ZIP2 <- 1 / (1 + dose_ratio2^HS_2)
+            ZIP1*ZIP2
+        },
+        ZIP_r={
             dose_ratio1 <- (treatment1dose / EC50_1)
             dose_ratio2 <- (treatment2dose / EC50_2)
             ZIP1 <- dose_ratio1^HS_1 / (1 + dose_ratio1^HS_1)
             ZIP2 <- dose_ratio2^HS_2 / (1 + dose_ratio2^HS_2)
-            ZIP1 + ZIP2 - (ZIP1 * ZIP2)
+            ZIP1 + ZIP2 - ZIP1*ZIP2
         },
         viability_1=viability_1,
         viability_2=viability_2,
@@ -119,3 +126,4 @@ combo_profiles1 |>
         viability_2=viability_2,
         by=c("treatment1id", "treatment2id", "treatment1dose", "treatment2dose", "sampleid")
     ) -> combo_profiles2
+

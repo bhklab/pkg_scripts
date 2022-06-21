@@ -108,48 +108,48 @@ assayMap_ <- list(
     )
 )
 
-## -- Define mappings for row and column annotations
-rData <- unique(nci_DT[, .SD, .SDcols=unlist(guess$rowDataMap)])
-rData[, rowKey := .I, by=c(guess$rowDataMap$id_columns)]
-setkeyv(rData, "rowKey")
+# ## -- Define mappings for row and column annotations
+# rData <- unique(nci_DT[, .SD, .SDcols=unlist(guess$rowDataMap)])
+# rData[, rowKey := .I, by=c(guess$rowDataMap$id_columns)]
+# setkeyv(rData, "rowKey")
 
-cData <- unique(nci_DT[, .SD, .SDcols=unlist(guess$colDataMap)])
-cData[, colKey := .I, by=c(guess$colDataMap$id_columns)]
-setkeyv(cData, "colKey")
+# cData <- unique(nci_DT[, .SD, .SDcols=unlist(guess$colDataMap)])
+# cData[, colKey := .I, by=c(guess$colDataMap$id_columns)]
+# setkeyv(cData, "colKey")
 
-## -- Extract metadata
-metadata_ <- unique(nci_DT[, .SD, .SDcols=guess$metadata[[2]]])
+# ## -- Extract metadata
+# metadata_ <- unique(nci_DT[, .SD, .SDcols=guess$metadata[[2]]])
 
-## -- Build assays
-aKeys <- groups$assayMap
+# ## -- Build assays
+# aKeys <- groups$assayMap
 
-nci_DT[, rowKey := .GRP, by=c(guess$rowDataMap$id_columns)]
-nci_DT[, colKey := .GRP, by=c(guess$colDataMap$id_columns)]
-nci_DT[, ogKey := .GRP, keyby=.(rowKey, colKey)]
+# nci_DT[, rowKey := .GRP, by=c(guess$rowDataMap$id_columns)]
+# nci_DT[, colKey := .GRP, by=c(guess$colDataMap$id_columns)]
+# nci_DT[, ogKey := .GRP, keyby=.(rowKey, colKey)]
 
-a1 <- unique(nci_DT[,
-    .SD, .SDcols=c("ogKey", assayMap_$sensitivity$mapped_columns)])
-a2 <- unique(nci_DT[,
-    .SD, .SDcols=c("ogKey", assayMap_$profiles$mapped_columns)])
-a3 <- unique(nci_DT[,
-    .SD, .SDcols=c("ogKey", assayMap_$assay_metadata$mapped_columns)])
-assays <- list(a1, a2, a3)
-for (a in assays) setkeyv(a, "ogKey")
+# a1 <- unique(nci_DT[,
+#     .SD, .SDcols=c("ogKey", assayMap_$sensitivity$mapped_columns)])
+# a2 <- unique(nci_DT[,
+#     .SD, .SDcols=c("ogKey", assayMap_$profiles$mapped_columns)])
+# a3 <- unique(nci_DT[,
+#     .SD, .SDcols=c("ogKey", assayMap_$assay_metadata$mapped_columns)])
+# assays <- list(a1, a2, a3)
+# for (a in assays) setkeyv(a, "ogKey")
 
-## -- Coerce back to data.table of raw data
-aMap <- unique(nci_DT[, .(rowKey, colKey, ogKey)])
-setkeyv(aMap, c("rowKey", "colKey", "ogKey"))
+# ## -- Coerce back to data.table of raw data
+# aMap <- unique(nci_DT[, .(rowKey, colKey, ogKey)])
+# setkeyv(aMap, c("rowKey", "colKey", "ogKey"))
 
-obj_ <- c(list(rData, cData), assays)
-# join everything with aMap
-obj_ <- lapply(obj_, merge, y=aMap)
+# obj_ <- c(list(rData, cData), assays)
+# # join everything with aMap
+# obj_ <- lapply(obj_, merge, y=aMap)
 
-# set key to all keys
-for (o_ in obj_) setkeyv(o_, c("ogKey", "rowKey", "colKey"))
-# reduce merge
-dt_ <- Reduce(f=merge, obj_) ## R barks on this line, results in the following error message:
+# # set key to all keys
+# for (o_ in obj_) setkeyv(o_, c("ogKey", "rowKey", "colKey"))
+# # reduce merge
+# dt_ <- Reduce(f=merge, obj_) ## R barks on this line, results in the following error message:
 
-dt_ <- cbind(dt_, as.data.table(metadata_))
+# dt_ <- cbind(dt_, as.data.table(metadata_))
 
 rm(list=setdiff(ls(), c("dataMapperTRE", "guess", "assayMap_"))); gc()
 
@@ -170,47 +170,47 @@ bench::system_time({ tre <- metaConstruct(dataMapperTRE) })
 
 ## rowData (treatments)
 
-# view the rowData
-rowData(tre)
+# # view the rowData
+# rowData(tre)
 
-# see the row identifier column names
-rowIDs(tre)
-# see the row metadata column names
-rowMeta(tre)
+# # see the row identifier column names
+# rowIDs(tre)
+# # see the row metadata column names
+# rowMeta(tre)
 
-## colData (samples)
+# ## colData (samples)
 
-# view the coldata
-colData(tre)
+# # view the coldata
+# colData(tre)
 
-# see the column identifier column names
-colIDs(tre)
-# see the column metdata colum names
-colMeta(tre)
+# # see the column identifier column names
+# colIDs(tre)
+# # see the column metdata colum names
+# colMeta(tre)
 
-## viewing the assay index
-getIntern(tre)  # retrieves data from the @.intern slot
-getIntern(tre, "assayIndex")  # get the list item with the associated name from @.intern slot
-tre@.intern$assayIndex  # equivalent to above, but without using accessor method
+# ## viewing the assay index
+# getIntern(tre)  # retrieves data from the @.intern slot
+# getIntern(tre, "assayIndex")  # get the list item with the associated name from @.intern slot
+# tre@.intern$assayIndex  # equivalent to above, but without using accessor method
 
-## assays
-tre@assays$sensitvity  # the raw format of the assay, indexed by primary key of the same name
-tre$sensitivity  # the assay with the row and col data joined to it via the assayIndex
+# ## assays
+# tre@assays$sensitvity  # the raw format of the assay, indexed by primary key of the same name
+# tre$sensitivity  # the assay with the row and col data joined to it via the assayIndex
 
-## making a simple summary assay
-sens_summary <- tre$sensitivity[,
-    .(
-        mean_drug1dose=mean(drug1dose),
-        mean_drug2dose=mean(drug2dose),
-        mean_viability=mean(viability)
-    ),
-    by=.(drug1id, drug2id, cellid)
-]
+# ## making a simple summary assay
+# sens_summary <- tre$sensitivity[,
+#     .(
+#         mean_drug1dose=mean(drug1dose),
+#         mean_drug2dose=mean(drug2dose),
+#         mean_viability=mean(viability)
+#     ),
+#     by=.(drug1id, drug2id, cellid)
+# ]
 
-## assign back to the object
-tre$sens_summary <- sens_summary
+# ## assign back to the object
+# tre$sens_summary <- sens_summary
 
-## view the raw assays
-tre@assays$sens_summary  # keyed by sens_summary column
-# repeated values in the foreign key of an assay when they are summarized
-mutable(tre@.intern$assayIndex)[!is.na(sens_summary), ]  # select rows with sens_summary values
+# ## view the raw assays
+# tre@assays$sens_summary  # keyed by sens_summary column
+# # repeated values in the foreign key of an assay when they are summarized
+# mutable(tre@.intern$assayIndex)[!is.na(sens_summary), ]  # select rows with sens_summary values

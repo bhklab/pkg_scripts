@@ -5,7 +5,7 @@ library(data.table)
 
 # -- Get our example data
 data(GDSCsmall)
-SE <- molecularProfiles(GDSCsmall)$rna
+SE <- molecularProfilesSlot(GDSCsmall)$rna
 features <- as.data.frame(rowData(SE))
 setDT(features)  # to data.table by reference
 
@@ -55,8 +55,6 @@ row_ranges <- makeGRangesFromDataFrame(
     keep.extra.columns=TRUE  # retain metadata
 )
 names(row_ranges) <- row_ranges$rownames
-
-
 
 RSE <- SummarizedExperiment(
     assays=assays(SE),

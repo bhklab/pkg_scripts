@@ -58,4 +58,4 @@ genomic_coord <- merge.data.table(
 )
 
 # -- save file
-fwrite(gene_coord, file=file.path(".local_data", "org.Hs.eg.db_gene_mappings.csv"))
+fwrite(genomic_coord, file=file.path(".local_data", "org.Hs.eg.db_gene_mappings.csv"))

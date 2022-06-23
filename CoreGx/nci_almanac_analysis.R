@@ -7,41 +7,38 @@ nci <- readRDS(file.path(".local_data", "NCI_ALMANAC_2017.rds"))
 
 # -- Fit the Hill curve model to monotherapy drugs and compute associated metrics
 treatmentResponse(nci) |>
-    subset(treatment2id == "") |>
-    aggregate(
+    endoaggregate(
         assay="sensitivity",
+        target="mono_raw",
+        subset=treatment2id != "",
         viability=mean(viability),
         by=c("treatment1id", "treatment1dose", "sampleid")
     ) |>
-    aggregate2({
-        fit <- PharmacoGx::logLogisticRegression(treatment1dose, viability)
-        ic50 <- PharmacoGx::computeIC50(treatment1dose, Hill_fit=fit)
-        auc <- PharmacoGx::computeAUC(treatment1dose, Hill_fit=fit, area.type="Fitted")
-        list(
-            HS=fit[['HS']], E_inf=fit[['E_inf']], EC50=fit[['EC50']],
-            Rsquare=attributes(fit)$Rsquare,
-            auc=auc,
-            ic50=ic50
+    endoaggregate(
+        assay="mono_raw",
+        target="mono_profiles",
+        {
+            fit <- PharmacoGx::logLogisticRegression(treatment1dose, viability)
+            ic50 <- PharmacoGx::computeIC50(treatment1dose, Hill_fit=fit)
+            auc <- PharmacoGx::computeAUC(treatment1dose, Hill_fit=fit,
+                area.type="Fitted")
+            list(
+                HS=fit[['HS']], E_inf=fit[['E_inf']], EC50=fit[['EC50']],
+                Rsquare=attributes(fit)$Rsquare,
+                auc=auc,
+                ic50=ic50
         )},
         by=c("treatment1id", "sampleid"),
         enlist=FALSE,
-<<<<<<< HEAD
-        nthread=20
+        nthread=18
     ) ->
-    monotherapy_profiles
-=======
-        nthread=6
-    ) -> monotherapy_profiles
-})
->>>>>>> 714d04b5704e52efb15b583a45f1eab29c199cf2
+    monotre
 # Store the results back in our PharmacoSet
-treatmentResponse(nci)$monotherapy_profiles <- monotherapy_profiles
 
 # -- Attach the Hill parameters from the monotherapy profiles to the combination data
 # Extract the monotherapy fits
-treatmentResponse(nci)$monotherapy_profiles |>
-    subset(Rsquare > 0.5, c("treatment1id", "sampleid", "HS", "E_inf", "EC50")) |>
-    unique() ->
+treatmentResponse(nci) |>
+    assay("monotherapy_profiles", summarize=TRUE, metadata=FALSE) ->
     monotherapy_fits
 
 treatmentResponse(nci)$sensitivity |>
@@ -65,6 +62,9 @@ setkeyv(combo_profiles, c("treatment1id", "treatment2id", "sampleid"))
 setcolorder(combo_profiles, c("treatment1id", "treatment2id", "sampleid"))
 
 # -- predict viability for each drug in our combination
+#
+
+
 # fix the scale of E_inf to be a proportion instead of a percent
 combo_profiles[,
     c("E_inf_1", "E_inf_2") := .(E_inf_1 / 100, E_inf_2 / 100)
@@ -84,7 +84,7 @@ combo_profiles[,
     by=c("treatment1id", "treatment2id", "treatment1dose", "treatment2dose", "sampleid")
 ]
 
-effectToDose <- function(treatment1dose, treatment2dose, viability, 
+effectToDose <- function(treatment1dose, treatment2dose, viability,
         E_inf_1, HS_1, EC50_1, E_inf_2, HS_2, EC50_2) {
     (treatment1dose /
         EC50_1 * ((1 - viability) / (viability - E_inf_1))^(1 / HS_1)) +
@@ -94,7 +94,7 @@ effectToDose <- function(treatment1dose, treatment2dose, viability,
 
 # -- compute our drug synergy metrics
 combo_profiles |>
-    aggregate2(
+    aggregate(
         HSA=min(viability_1, viability_2),
         Bliss=prod(viability_1, viability_2),
         Loewe_CI=(
@@ -119,14 +119,11 @@ combo_profiles |>
             ZIP2 <- E_inf_2 * dose_ratio2^HS_2 / (1 + dose_ratio2^HS_2)
             ZIP1 * ZIP2
         },
-<<<<<<< HEAD
-        PANEL=PANEL,
-=======
         Loewe=optimise(
-                f = obj,
+                f = effectToDose,
                 interval = c(0, 1),
-                dose1 = treatment1dose,
-                dose2 = treatment2dose,
+                treatment1dose = treatment1dose,
+                treatment2dose = treatment2dose,
                 HS_1 = HS_1,
                 HS_2 = HS_2,
                 E_inf_1 = E_inf_1,
@@ -134,24 +131,13 @@ combo_profiles |>
                 EC50_1 = EC50_1,
                 EC50_2 = EC50_2
             )$minimum,
->>>>>>> 714d04b5704e52efb15b583a45f1eab29c199cf2
         viability_1=viability_1,
         viability_2=viability_2,
         viability=viability / 100,
-        nthread=1,
+        nthread=10,
         by=c("treatment1id", "treatment2id", "treatment1dose", "treatment2dose", "sampleid")
     ) ->
     combo_profiles1
-
-# -- compute our drug synergy metrics
-combo_profiles |>
-    aggregate2(
-        viability_1=viability_1,
-        viability_2=viability_2,
-        viability=viability / 100,
-        nthread=1,
-        by=c("treatment1id", "treatment2id", "treatment1dose", "treatment2dose", "sampleid")
-    ) -> combo_profiles1
 
 
 # -- compute combination index and score
@@ -161,15 +147,10 @@ combo_profiles1 |>
         HSA_score=HSA - viability,
         Bliss_CI=viability / Bliss,
         Bliss_score=Bliss - viability,
-<<<<<<< HEAD
         ZIP_CI=viability / ZIP,
         ZIP_score=ZIP - viability,
-        ZIP_score2=ZIP2 - viability,
-=======
-        ZIP_CI=viability / ZIP_v,
-        ZIP_score=ZIP_v - viability,
+        ZIP2_score=ZIP2 - viability,
         Loewe_score=Loewe - viability,
->>>>>>> 714d04b5704e52efb15b583a45f1eab29c199cf2
         Loewe_CI=Loewe_CI,
         viability=viability,
         viability_1=viability_1,
@@ -179,11 +160,10 @@ combo_profiles1 |>
     ) ->
     combo_profiles2
 
-<<<<<<< HEAD
 
 combination_profiles <- combo_profiles2[,
     lapply(.SD, mean, na.rm=TRUE),
-    by=c("treatment1id", "treatment2id", "sampleid", "PANEL")
+    by=c("treatment1id", "treatment2id", "sampleid")
 ]
 
 top_synergy <- combination_profiles[
@@ -235,11 +215,10 @@ combo_plot <- melt(combination_profiles,
 library(ggplot2)
 ggplot(combo_plot) +
     geom_density(aes(x=score, colour=model))
-=======
 dt <- merge.data.table(combo_profiles, combo_profiles1, by=c("treatment1id", "treatment2id", "treatment1dose", "treatment2dose", "sampleid"))
 
 
-effectToDose <- function(treatment1dose, treatment2dose, viability, 
+effectToDose <- function(treatment1dose, treatment2dose, viability,
         E_inf_1, HS_1, EC50_1, E_inf_2, HS_2, EC50_2) {
     (treatment1dose /
         EC50_1 * ((1 - viability) / (viability - E_inf_1))^(1 / HS_1)) +
@@ -250,8 +229,8 @@ effectToDose <- function(treatment1dose, treatment2dose, viability,
 dt2 <- dt[,
     .(loewe_val=effectToDose(
         treatment1dose, treatment2dose, Loewe,
-        E_inf_1, HS_1, EC50_1, 
-        E_inf_2, HS_2, EC50_2)), 
+        E_inf_1, HS_1, EC50_1,
+        E_inf_2, HS_2, EC50_2)),
     by=c("treatment1id", "treatment2id", "treatment1dose", "treatment2dose", "sampleid")]
 
 combo_profiles2 |>
@@ -261,4 +240,3 @@ combo_profiles2 |>
 cor(combo_profiles2[, .(HSA_score, Bliss_score, Loewe_score, ZIP_score)], method="spearman")
 
 cor(combinations[, .(HSA_score, Bliss_score, Loewe_score, ZIP_score)], method="spearman")
->>>>>>> 714d04b5704e52efb15b583a45f1eab29c199cf2

@@ -38,12 +38,8 @@ ranged_features[
     is.na(start),
     c("start", "end", "length", "strand") := list(-1, -1, 0, "*")
 ]
-# deal with any multi-mapped genes, this is usually due to X/Y chromosome with same gene
-ranged_features <- ranged_features[,
-    lapply(.SD, \(x) paste0(unique(x), collapse="|")),
-    by=rownames
-]
 # drop Y chromosome version if duplicated genes
+# (lexically X is before Y so first always select X)
 ranged_features <- ranged_features[, lapply(.SD, first), by=gene_id]
 
 # make sure duplicated were only due to chromosomes

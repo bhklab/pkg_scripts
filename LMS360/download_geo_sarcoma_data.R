@@ -23,7 +23,7 @@ brain_array_urls <- function(array, species="hs", annotation="ensg", version="25
         "/", c("", "", "pd."), array, c("", "", "."), species, c("", "", "."),
         annotation, c("cdf", "probe", ""), "_", version, ".tar.gz")
 }
-arrays <- c("hgu133a", "hgu133plus2")
+arrays <- c("hgu133a", "hgu133plus2", "hgu133a")
 brain_array <- vapply(arrays, brain_array_urls, character(3))
 for (i in seq_len(ncol(brain_array))) {
     for (pkg in brain_array[, i]) {
@@ -34,7 +34,7 @@ for (i in seq_len(ncol(brain_array))) {
 cdfs <- gsub("\\_.*$", "", basename(grep(pattern="cdf\\_", brain_array, value=TRUE)))
 for (cdf in cdfs) library(cdf, character.only=TRUE)
 
-datasets <- c("GSE21122", "GSE21050")
+datasets <- c("GSE21122", "GSE21050", "GSE30929")
 # match the CDF to the dataset
 names(cdfs) <- datasets
 data_dir <- "tmp"
@@ -99,7 +99,7 @@ for (ds in datasets) {
 for (ds in names(se_list)) {
     qsave(se_list[[ds]],
         file=file.path(data_dir,
-            paste0(ds, "_", class(se_list[[ds]])[1], "_", today(), ".qs")
+            paste0(ds, "_", class(se_list[[ds]])[1], "_", Sys.Date(), ".qs")
         ),
         nthread=getDTthreads()
     )

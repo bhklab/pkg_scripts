@@ -67,3 +67,44 @@ signature_df <- merge.data.table(signature_df, signature_metadata, by="SigID",
 fwrite(signature_df, file=.file.path(data_dir, "genesigdb_all_signature.csv"))
 
 sarcoma_sigs <- signature_df[Tissue == "Sarcoma", ]
+
+# -- Find the hypergeometric intersection of the sarcoma genesets
+
+library(data.table)
+
+genesigdb <- fread("local_data/genesigdb_sarcoma_sigs.csv")
+gs_unique <- unique(genesigdb[, .(SigName, gene_id)])
+gs_list <- gs_unique[, .(gene_list=list(unique(gene_id))), by=SigName]
+setkeyv(gs_list, "SigName")
+gs_exp <- gs_list[CJ(SigName, SigName, sorted=FALSE, unique=TRUE)]
+gs_exp <- merge.data.table(
+    gs_exp,
+    gs_exp[!duplicated(SigName), .(SigName, i.gene_list=gene_list)],
+    by.x="i.SigName",
+    by.y="SigName"
+)
+gs_exp[
+    SigName != i.SigName,
+    .(
+        sig_intersect=list(unique(intersect(unlist(gene_list), unlist(i.gene_list)))),
+        sig_all=list(unique(c(unlist(gene_list), unlist(i.gene_list))))
+    ),
+    by=.(SigName, i.SigName)
+] -> geneset_olaps
+
+geneset_olaps[,
+    overlap_prop := length(unlist(sig_intersect)) / length(unlist(sig_all)),
+    by=.(SigName, i.SigName)
+]
+
+geneset_olaps[,
+    `:=`(
+        src1=gsub("_.*$", "", SigName),
+        src2=gsub("_.*$", "", i.SigName)
+)]
+
+geneset_signif_olaps <- geneset_olaps[
+    src1 != src2 & overlap_prop > 0,
+][order(-overlap_prop)]
+
+fwrite(geneset_signif_olaps, file=file.path("local_data", "sarc_genesigdb_intersections.csv"))

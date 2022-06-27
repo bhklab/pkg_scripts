@@ -18,18 +18,18 @@ inchikeys <- unique(na.omit(compound$inchikey))
 smiles <- unique(na.omit(compound$smiles))
 
 ## 1. Map from names via PubChem Compound API
-CIDfromNames <- getPubChemCompound(ids[1:1000], from='name', 
+CIDfromNames <- getPubChemCompound(ids[1:1000], from='name',
     to='cids', proxy=TRUE)
 
 
 # find the last batch number written to disk
-offset <-  max(as.numeric(gsub('^CIDfromSMILES_|.qs$', '', 
+offset <-  max(as.numeric(gsub('^CIDfromSMILES_|.qs$', '',
         list.files('local_data', pattern='CIDfromSMILES_')))) + 1
 
 # -- SMILES -> CID
 # Note: This is really slow
 t1b <- Sys.time()
-CIDfromSMILES <- getPubChemCompound(smiles[1:100], from='fastidentity/smiles', 
+CIDfromSMILES <- getPubChemCompound(smiles[1:100], from='fastidentity/smiles',
     to='cids', proxy=TRUE, batch=FALSE)
 t2b <- Sys.time()
 q2_time <- t2b - t1b
@@ -44,7 +44,7 @@ NameFromCID <- getPubChemCompound(cids, proxy=TRUE,
 NameFromCID <- fread('local_data/NameFromSMILES.csv')
 setnames(NameFromCID, c('cids', 'Title'), c('new_cid', 'PubChem_title'))
 drugs_with_ids <- fread('local_data/drugs_with_ids.csv')
-drugs_with_new_ids <- merge.data.table(drugs_with_ids, NameFromCID, by='smiles', 
+drugs_with_new_ids <- merge.data.table(drugs_with_ids, NameFromCID, by='smiles',
     all.x=TRUE)
 
 # Check for different CIDs
@@ -55,12 +55,12 @@ inchikeys <- drugs_with_new_ids[is.na(new_cid) & !is.na(inchikey), inchikey]
 drug_names <- drugs_with_new_ids[is.na(new_cid) & is.na(inchikey), unique.drugid]
 
 # -- Map missing new_cid from inchikey
-CIDfromInchikey <- getPubChemCompound(inchikeys, from='inchikey', batch=FALSE, 
+CIDfromInchikey <- getPubChemCompound(inchikeys, from='inchikey', batch=FALSE,
     proxy=TRUE)
 
 
 # t1b <- Sys.time()
-# CIDfromSMILES <- getPubChemCompound(smiles[1:100], from='fastidentity/smiles', 
+# CIDfromSMILES <- getPubChemCompound(smiles[1:100], from='fastidentity/smiles',
 #     to='cids', proxy=TRUE, batch=FALSE, BPPARAM=bp)
 # t2b <- Sys.time()
 # q2_time <- t2b - t1b
@@ -72,7 +72,7 @@ CIDfromInchikey <- getPubChemCompound(inchikeys, from='inchikey', batch=FALSE,
 # proxyDT <- proxyDT[, url := paste0(ip, ":", port), by=.(ip, port)]
 # proxy_urls <- proxyDT$url
 
-# queries <- unlist(getPubChemCompound(smiles[1:1000], from='fastidentity/smiles', 
+# queries <- unlist(getPubChemCompound(smiles[1:1000], from='fastidentity/smiles',
 #     to='cids', proxy=TRUE, batch=FALSE, query_only=TRUE, BPPARAM=bp))
 # batch_size <- ceiling(length(queries) / nthreads)
 # split_queries <- split(queries, floor(seq_along(queries) / batch_size))
@@ -95,7 +95,7 @@ CIDfromInchikey <- getPubChemCompound(inchikeys, from='inchikey', batch=FALSE,
 # })
 
 # batch_time <- bench_time({
-#     batch_result <- synchronise(async_map(queries[1:100], 
+#     batch_result <- synchronise(async_map(queries[1:100],
 #         .f=http_get_proxy_retry, proxies=proxy_urls))
 # })
 
@@ -107,7 +107,7 @@ CIDfromInchikey <- getPubChemCompound(inchikeys, from='inchikey', batch=FALSE,
 # -- inchikeys -> CID
 # Note: many CID per inchikey, not that useful
 t1a <- Sys.time()
-CIDfromInchikey <- getPubChemCompound(inchikeys[1:1000], from='inchikey', to='cids', 
+CIDfromInchikey <- getPubChemCompound(inchikeys[1:1000], from='inchikey', to='cids',
     proxy=TRUE, batch=FALSE)
 t2a <- Sys.time()
 q1_time = t2a - t1a

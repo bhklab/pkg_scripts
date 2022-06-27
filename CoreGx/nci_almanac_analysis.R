@@ -30,18 +30,17 @@ treatmentResponse(nci) |>
         )},
         by=c("treatment1id", "sampleid"),
         enlist=FALSE,
-        nthread=18
+        nthread=6
     ) ->
     monotre
-# Store the results back in our PharmacoSet
 
 # -- Attach the Hill parameters from the monotherapy profiles to the combination data
 # Extract the monotherapy fits
-treatmentResponse(nci) |>
-    assay("monotherapy_profiles", summarize=TRUE, metadata=FALSE) ->
+monotre |>
+    assay("mono_profiles", summarize=TRUE, metadata=FALSE) ->
     monotherapy_fits
 
-treatmentResponse(nci)$sensitivity |>
+monotre$sensitivity |>
     subset(treatment2id != "") ->
     combo_profiles
 
@@ -93,6 +92,7 @@ effectToDose <- function(treatment1dose, treatment2dose, viability,
 }
 
 # -- compute our drug synergy metrics
+setkeyv(combo_profiles, c("treatment1id", "treatment2id", "treatment1dose", "treatment2dose", "sampleid"))
 combo_profiles |>
     aggregate(
         HSA=min(viability_1, viability_2),
@@ -112,33 +112,36 @@ combo_profiles |>
             ZIP2 <- 1 / (1 + dose_ratio2^HS_2)
             ZIP1 * ZIP2
         },
-        ZIP2={
-            dose_ratio1 <- (treatment1dose / EC50_1)
-            dose_ratio2 <- (treatment2dose / EC50_2)
-            ZIP1 <- E_inf_1 * dose_ratio1^HS_1 / (1 + dose_ratio1^HS_1)
-            ZIP2 <- E_inf_2 * dose_ratio2^HS_2 / (1 + dose_ratio2^HS_2)
-            ZIP1 * ZIP2
-        },
-        Loewe=optimise(
-                f = effectToDose,
-                interval = c(0, 1),
-                treatment1dose = treatment1dose,
-                treatment2dose = treatment2dose,
-                HS_1 = HS_1,
-                HS_2 = HS_2,
-                E_inf_1 = E_inf_1,
-                E_inf_2 = E_inf_2,
-                EC50_1 = EC50_1,
-                EC50_2 = EC50_2
-            )$minimum,
+        Loewe=PharmacoGx::computeLoewe(
+            treatment1dose = treatment1dose,
+            treatment2dose = treatment2dose,
+            HS_1 = HS_1,
+            HS_2 = HS_2,
+            E_inf_1 = E_inf_1,
+            E_inf_2 = E_inf_2,
+            EC50_1 = EC50_1,
+            EC50_2 = EC50_2
+        ),
         viability_1=viability_1,
         viability_2=viability_2,
         viability=viability / 100,
-        nthread=10,
+        nthread=6,
         by=c("treatment1id", "treatment2id", "treatment1dose", "treatment2dose", "sampleid")
     ) ->
     combo_profiles1
 
+bench::mark({
+combo_profiles[1:5, .(Loewe=PharmacoGx::computeLoewe(
+            treatment1dose = treatment1dose,
+            treatment2dose = treatment2dose,
+            HS_1 = HS_1,
+            HS_2 = HS_2,
+            E_inf_1 = E_inf_1,
+            E_inf_2 = E_inf_2,
+            EC50_1 = EC50_1,
+            EC50_2 = EC50_2
+        )), by=c("treatment1id", "treatment2id", "treatment1dose", "treatment2dose", "sampleid")]
+}) -> bmark
 
 # -- compute combination index and score
 combo_profiles1 |>

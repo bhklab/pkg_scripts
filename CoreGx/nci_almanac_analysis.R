@@ -3,14 +3,15 @@ library(data.table)
 library(BiocParallel)
 
 nci <- readRDS(file.path(".local_data", "NCI_ALMANAC_2017.rds"))
-.nci <- copy(nci)
+
 
 # -- Fit the Hill curve model to monotherapy drugs and compute associated metrics
+bench::system_time({
 treatmentResponse(nci) |>
     endoaggregate(
         assay="sensitivity",
         target="mono_raw",
-        subset=treatment2id != "",
+        subset=treatment2id == "",
         viability=mean(viability),
         by=c("treatment1id", "treatment1dose", "sampleid")
     ) |>
@@ -23,88 +24,79 @@ treatmentResponse(nci) |>
             auc <- PharmacoGx::computeAUC(treatment1dose, Hill_fit=fit,
                 area.type="Fitted")
             list(
-                HS=fit[['HS']], E_inf=fit[['E_inf']], EC50=fit[['EC50']],
+                HS=fit[['HS']],
+                E_inf=fit[['E_inf']] / 100,
+                EC50=fit[['EC50']],
                 Rsquare=attributes(fit)$Rsquare,
                 auc=auc,
                 ic50=ic50
-        )},
+            )
+        },
         by=c("treatment1id", "sampleid"),
         enlist=FALSE,
-        nthread=6
+        nthread=22
     ) ->
-    monotre
+    tre
+}) -> m1
 
+bench::system_time({
 # -- Attach the Hill parameters from the monotherapy profiles to the combination data
 # Extract the monotherapy fits
-monotre |>
-    assay("mono_profiles", summarize=TRUE, metadata=FALSE) ->
-    monotherapy_fits
+tre |>
+    endoaggregate(
+        assay="sensitivity",
+        target="combo_raw",
+        subset=treatment2id != "",
+        viability=mean(viability) / 100,
+        by=c("treatment1id", "treatment1dose", "treatment2id", "treatment2dose",
+            "sampleid")
+    ) ->
+    tre
+}) -> m2
 
-monotre$sensitivity |>
-    subset(treatment2id != "") ->
-    combo_profiles
-
-# Merge with the fits from the monotherapy experiments
-combo_profiles <- merge(
-    combo_profiles,
-    monotherapy_fits,
-    by=c("treatment1id", "sampleid")
-) # for treatment1id
-combo_profiles <- merge(
-    combo_profiles,
-    monotherapy_fits,
-    by.x=c("treatment2id", "sampleid"),
-    by.y=c("treatment1id", "sampleid"),
-    suffixes=c("_1", "_2")
-)
-setkeyv(combo_profiles, c("treatment1id", "treatment2id", "sampleid"))
-setcolorder(combo_profiles, c("treatment1id", "treatment2id", "sampleid"))
+bench::system_time({
+tre |>
+    mergeAssays(
+        "combo_raw",
+        "mono_profiles",
+        by=c("treatment1id", "sampleid")
+    ) |>
+    mergeAssays(
+        "combo_raw",
+        "mono_profiles",
+        by=c(treatment2id="treatment1id", "sampleid"),
+        suffixes=c("_1", "_2")
+    ) ->
+    tre
+}) -> m3
 
 # -- predict viability for each drug in our combination
-#
 
-
-# fix the scale of E_inf to be a proportion instead of a percent
-combo_profiles[,
-    c("E_inf_1", "E_inf_2") := .(E_inf_1 / 100, E_inf_2 / 100)
-]
-# predict viability at the combo doses from the Hill curves fit to monotherapy data
-combo_profiles[,
-    c("viability_1", "viability_2") := .(
-        PharmacoGx:::.Hill(
-            log10(treatment1dose),
-            c(HS_1, E_inf_1, log10(EC50_1))
-        ),
-        PharmacoGx:::.Hill(
-            log10(treatment1dose),
-            c(HS_1, E_inf_2, log10(EC50_2))
-        )
-    ),
-    by=c("treatment1id", "treatment2id", "treatment1dose", "treatment2dose", "sampleid")
-]
-
-effectToDose <- function(treatment1dose, treatment2dose, viability,
-        E_inf_1, HS_1, EC50_1, E_inf_2, HS_2, EC50_2) {
-    (treatment1dose /
-        EC50_1 * ((1 - viability) / (viability - E_inf_1))^(1 / HS_1)) +
-    (treatment2dose /
-        EC50_2 * ((1 - viability) / (viability - E_inf_2))^(1 / HS_2))
-}
+bench::system_time({
+tre |>
+    endoaggregate(
+        assay="combo_raw",
+        target="combo_raw",
+        {
+            v1 <- PharmacoGx:::.Hill(log10(treatment1dose),
+                c(HS_1, E_inf_1, log10(EC50_1)))
+            v2 <-  PharmacoGx:::.Hill(log10(treatment2dose),
+                c(HS_2, E_inf_2, log10(EC50_2)))
+            list(viability_1=v1, viability_2=v2)
+        },
+        by=assayKeys(tre, "combo_raw"),
+        enlist=FALSE
+    ) ->
+    ntre1
+}) -> m4
 
 # -- compute our drug synergy metrics
-setkeyv(combo_profiles, c("treatment1id", "treatment2id", "treatment1dose", "treatment2dose", "sampleid"))
-combo_profiles |>
-    aggregate(
+bench::system_time({
+ntre1 |>
+    endoaggregate(
+        assay="combo_raw",
         HSA=min(viability_1, viability_2),
         Bliss=prod(viability_1, viability_2),
-        Loewe_CI=(
-            (treatment1dose /
-                EC50_1 * ((1 - viability) / (viability - E_inf_1))^(1 / HS_1)
-            ) +
-            (treatment2dose /
-                EC50_2 * ((1 - viability) / (viability - E_inf_2))^(1 / HS_2)
-            )
-        ),
         ZIP={
             dose_ratio1 <- (treatment1dose / EC50_1)
             dose_ratio2 <- (treatment2dose / EC50_2)
@@ -113,133 +105,69 @@ combo_profiles |>
             ZIP1 * ZIP2
         },
         Loewe=PharmacoGx::computeLoewe(
-            treatment1dose = treatment1dose,
-            treatment2dose = treatment2dose,
-            HS_1 = HS_1,
-            HS_2 = HS_2,
-            E_inf_1 = E_inf_1,
-            E_inf_2 = E_inf_2,
-            EC50_1 = EC50_1,
-            EC50_2 = EC50_2
+            treatment1dose=treatment1dose,
+            treatment2dose=treatment2dose,
+            HS_1=HS_1,
+            HS_2=HS_2,
+            E_inf_1=E_inf_1,
+            E_inf_2=E_inf_2,
+            EC50_1=EC50_1,
+            EC50_2=EC50_2
         ),
-        viability_1=viability_1,
-        viability_2=viability_2,
-        viability=viability / 100,
-        nthread=6,
-        by=c("treatment1id", "treatment2id", "treatment1dose", "treatment2dose", "sampleid")
+        by=assayKeys(ntre1, "combo_raw")
     ) ->
-    combo_profiles1
+    ntre2
+}) -> m5
 
-bench::mark({
-combo_profiles[1:5, .(Loewe=PharmacoGx::computeLoewe(
-            treatment1dose = treatment1dose,
-            treatment2dose = treatment2dose,
-            HS_1 = HS_1,
-            HS_2 = HS_2,
-            E_inf_1 = E_inf_1,
-            E_inf_2 = E_inf_2,
-            EC50_1 = EC50_1,
-            EC50_2 = EC50_2
-        )), by=c("treatment1id", "treatment2id", "treatment1dose", "treatment2dose", "sampleid")]
-}) -> bmark
 
 # -- compute combination index and score
-combo_profiles1 |>
-    aggregate2(
+bench::system_time({
+ntre2 |>
+    endoaggregate(
+        assay="combo_raw",
         HSA_CI=viability / HSA,
         HSA_score=HSA - viability,
         Bliss_CI=viability / Bliss,
         Bliss_score=Bliss - viability,
         ZIP_CI=viability / ZIP,
         ZIP_score=ZIP - viability,
-        ZIP2_score=ZIP2 - viability,
         Loewe_score=Loewe - viability,
-        Loewe_CI=Loewe_CI,
-        viability=viability,
-        viability_1=viability_1,
-        viability_2=viability_2,
-        PANEL=unique(PANEL),
-        by=c("treatment1id", "treatment2id", "treatment1dose", "treatment2dose", "sampleid")
+        Loewe_CI=viability / Loewe,
+        by=assayKeys(ntre2, "combo_raw")
     ) ->
-    combo_profiles2
+    ntre2
+}) -> m6
 
-
-combination_profiles <- combo_profiles2[,
-    lapply(.SD, mean, na.rm=TRUE),
-    by=c("treatment1id", "treatment2id", "sampleid")
-]
-
-top_synergy <- combination_profiles[
-    order(-Bliss_score),
-    .(
-        treatment1id=unique(treatment1id)[1:10],
-        treatment2id=unique(treatment2id)[1:10]
-    )]
-
-top_antagonism <- combination_profiles[
-    order(Bliss_score),
-    .(
-        treatment1id=unique(treatment1id)[1:10],
-        treatment2id=unique(treatment2id)[1:10]
-    )]
-
-subset_drugs <- rbind(top_synergy, top_antagonism)
-nci_raw <- as(treatmentResponse(.nci), "data.table")
-setkeyv(nci_raw, c("treatment1id", "treatment2id"))
-
-tx1 <- unique(unname(unlist(subset_drugs)))
-tx2 <- c(unique(unname(subset_drugs$treatment2id)), "")
-
-tre <- treatmentResponse(.nci)
-tre |>
-    subset(treatment1id %in% tx1 & treatment2id %in% tx2, ) ->
-    sub_tre
-
-nci_dem_data <- as(sub_tre, "data.table")
-
-## Sanity checks
-combo_synergy <- treatmentResponse(nci)$profiles |>
-    aggregate2(
-        mean(SCORE, na.rm=TRUE),
+# -- summarize our combination scores
+bench::system_time({
+ntre2 |>
+    endoaggregate(
+        assay="combo_raw",
+        target="combo_profiles",
+        HSA_CI=mean(HSA_CI, na.rm=TRUE),
+        Bliss_CI=mean(Bliss_CI, na.rm=TRUE),
+        Loewe_CI=mean(Loewe_CI, na.rm=TRUE),
+        ZIP_CI=mean(ZIP_CI, na.rm=TRUE),
+        HSA_score=mean(HSA_score, na.rm=TRUE),
+        Bliss_score=mean(Bliss_score, na.rm=TRUE),
+        Loewe_score=mean(Loewe_score, na.rm=TRUE),
+        ZIP_score=mean(ZIP_score, na.rm=TRUE),
         by=c("treatment1id", "treatment2id", "sampleid")
-    )
+    ) ->
+    ntre3
+}) -> m7
 
-cor(combination_profiles[,
-    .(HSA_score, Bliss_score, ZIP_score, ZIP_score2)
-    ], method="spearman")
+# -- extract our combo scores and have a look
+combo_prof <- ntre3$combo_profiles
+cor(combo_prof[,
+    .(HSA_score, Bliss_score, Loewe_score, ZIP_score)
+], method="pearson", use="complete.obs")
 
-cor(combination_profiles[,
-    .(HSA_CI, Bliss_CI, ZIP_CI, Loewe_CI)
-    ], method="spearman")
-
-combo_plot <- melt(combination_profiles,
-    measure=patterns(".*score"), value.name="score", variable.name="model")
-
-library(ggplot2)
-ggplot(combo_plot) +
-    geom_density(aes(x=score, colour=model))
-dt <- merge.data.table(combo_profiles, combo_profiles1, by=c("treatment1id", "treatment2id", "treatment1dose", "treatment2dose", "sampleid"))
-
-
-effectToDose <- function(treatment1dose, treatment2dose, viability,
-        E_inf_1, HS_1, EC50_1, E_inf_2, HS_2, EC50_2) {
-    (treatment1dose /
-        EC50_1 * ((1 - viability) / (viability - E_inf_1))^(1 / HS_1)) +
-    (treatment2dose /
-        EC50_2 * ((1 - viability) / (viability - E_inf_2))^(1 / HS_2))
-}
-
-dt2 <- dt[,
-    .(loewe_val=effectToDose(
-        treatment1dose, treatment2dose, Loewe,
-        E_inf_1, HS_1, EC50_1,
-        E_inf_2, HS_2, EC50_2)),
-    by=c("treatment1id", "treatment2id", "treatment1dose", "treatment2dose", "sampleid")]
-
-combo_profiles2 |>
-    aggregate2(lapply(.SD, mean), by=c("treatment1id", "treatment2id", "sampleid"), enlist=FALSE) ->
-    combinations
-
-cor(combo_profiles2[, .(HSA_score, Bliss_score, Loewe_score, ZIP_score)], method="spearman")
-
-cor(combinations[, .(HSA_score, Bliss_score, Loewe_score, ZIP_score)], method="spearman")
+## _score columns calculate the difference between null model viability and
+## observed viability, where positive values are good
+combo_prof[
+    order(-Bliss_score),
+    lapply(.SD, mean, na.rm=TRUE),
+    .SDcols=is.numeric,
+    by=c("treatment1id", "treatment2id")
+]

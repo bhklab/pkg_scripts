@@ -6,6 +6,9 @@ data_dir <- ".local_data"
 
 nci <- readRDS(file.path(data_dir, "NCI_ALMANAC_2017.rds"))
 
+# configure parallelization
+nthread <- 4
+setDTthreads(nthread)
 
 # -- Fit the Hill curve model to monotherapy drugs and compute associated metrics
 bench::system_time({
@@ -37,7 +40,7 @@ treatmentResponse(nci) |>
         },
         by=c("treatment1id", "sampleid"),
         enlist=FALSE,
-        nthread=22
+        nthread=nthread
     ) ->
     tre
 }) -> m1
@@ -141,6 +144,8 @@ ntre2 |>
     ntre3
 }) -> m6
 
+(runtime <- m1 + m2 + m3 + m4 + m5 + m6)
+
 # -- extract our combo scores and have a look
 combo_prof <- ntre3$combo_profiles
 cor(combo_prof[,
@@ -153,13 +158,13 @@ combo_prof[,
         na.rm=TRUE)
 ]
 combo_prof[,
-    max_CI := pmax(HSA_CI, Bliss_CI, Loewe_CI, ZIP_CI)
+    max_CI := pmax(HSA_CI, Bliss_CI, Loewe_CI, ZIP_CI, na.rm=TRUE)
 ]
 combo_prof[
     order(-min_score),
-    .SD, .SDcols=patterns("*_score"),
+    .SD, .SDcols=patterns("*_score|*prop"),
     by=c(assayKeys(ntre3, "combo_profiles"))
-] |> head(50)
+] |> head(15)
 
 ## _score columns calculate the difference between null model viability and
 ## observed viability, where positive values are good
@@ -167,13 +172,8 @@ combo_prof[,
     lapply(.SD, median, na.rm=TRUE),
     .SDcols=is.numeric,
     by=c("treatment1id", "treatment2id")
-][order(-min_score)] |> head(10)
+][order(-min_score)] |> head(15)
 
-combo_prof[,
-    lapply(.SD, median, na.rm=TRUE),
-    .SDcols=is.numeric,
-    by=c("sampleid")
-][order(-min_score)] |> head(25)
 
 ## -- save the results to compare against SYNERGxDB
 setorderv(combo_prof, c("min_score"), order=-1L)

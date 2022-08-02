@@ -15,7 +15,7 @@ plan(
 ## ============================================================================
 
 ###############################################################################
-use_all_single_dose = FALSE
+use_all_single_dose = TRUE
 ###############################################################################
 
 data_path <- "~/bhklab/feifei/data" ## add your path to NCI PSet here
@@ -49,8 +49,6 @@ combo_viability <- tre$combo_viability
 ## Build a new combo_viability out of mono_viability with one traetment with dose 0
 mono_viability <- tre$mono_viability
 drug_cell_combo <- combo_viability[, .(treatment1id, treatment2id, sampleid)] |> unique()
-combo_viability_0 <- drug_cell_combo ## Can you guess why the 0?
-combo_viability_0[, `:=`(treatment1dose = 0, treatment2dose = 0, combo_viability = 1)]
 
 if (use_all_single_dose) {
     ## use all single drug screening dose
@@ -109,7 +107,6 @@ if (use_all_single_dose) {
     )][!is.na(treatment1id)][, `:=`(combo_viability = viability, viability = NULL)]
 }
 
-setcolorder(combo_viability_0, colnames(combo_viability))
 setcolorder(combo_viability_1, colnames(combo_viability))
 setcolorder(combo_viability_2, colnames(combo_viability))
 
@@ -117,6 +114,7 @@ synergyfinder_input <- rbindlist(
     list(combo_viability_1, combo_viability_2, combo_viability)
 )
 synergyfinder_input <- unique(synergyfinder_input) ## duplicate rows from joining mono_viability with combo_viability
+
 block_id_cols <- c("treatment1id", "treatment2id", "sampleid")
 synergyfinder_input[, block_id := .GRP, by = block_id_cols]
 
@@ -150,8 +148,8 @@ bench::system_time({
 #    synergyfinder_input_reshape <- future::value(parallelised_reshape)
 #}) -> synergyfinder_reshape_time
 
-saveRDS(synergyfinder_input_reshape, file.path(data_path, "synergyfinder_input_reshape.rds"))
-saveRDS(synergyfinder_reshape_time, file.path(data_path, "synergyfinder_reshape_time.rds"))
+saveRDS(synergyfinder_input_reshape, file.path(data_path, "synergyfinder_input_reshape_2.rds"))
+saveRDS(synergyfinder_reshape_time, file.path(data_path, "synergyfinder_reshape_time_2.rds"))
 
 bench::system_time({
     synergyfinder_result <- CalculateSynergy(
@@ -177,6 +175,6 @@ bench::system_time({
 #    synergyfinder_result <- future::value(parallelised_synergy)
 #}) -> synergyfinder_compute_time
 
-saveRDS(synergyfinder_result, file.path(data_path, "synergyfinder_result.rds"))
-saveRDS(synergyfinder_compute_time, file.path(data_path, "synergyfinder_compute_time.rds"))
+saveRDS(synergyfinder_result, file.path(data_path, "synergyfinder_result_2.rds"))
+saveRDS(synergyfinder_compute_time, file.path(data_path, "synergyfinder_compute_time_2.rds"))
 

@@ -287,14 +287,14 @@ combo_profiles_rep <- copy(combo_profiles)[bio_rep > 1,
 ## Fit two-way projected Hill curves
 ZIP_fit_pgx <- fitTwowayZIP(combo_profiles_rep, residual = "logcosh")
 ZIP_fit_pgx[,
-    ZIP_fit := ( 1 - 
+    ZIP_fit := (
         hillCurve(
             dose = log10(treatment1dose),
             EC50 = log10(EC50_proj_2_to_1),
             HS = HS_proj_2_to_1,
             E_inf = E_inf_proj_2_to_1,
             E_ninf = E_ninf_proj_2_to_1
-        ) + 1 -
+        ) +
         hillCurve(
             dose = log10(treatment2dose),
             EC50 = log10(EC50_proj_1_to_2),
@@ -302,7 +302,7 @@ ZIP_fit_pgx[,
             E_inf = E_inf_proj_1_to_2,
             E_ninf = E_ninf_proj_1_to_2
         )
-    ) * 100 / 2
+    ) / 2
 ]
 ZIP_fit_pgx[, bio_rep := seq_len(.N),
     by = .(treatment1id, treatment2id, treatment1dose, treatment2dose, sampleid)
@@ -313,7 +313,7 @@ ZIP_fit_pgx[
 ]
 
 pgx_synergy_refs <- pgx_synergy_refs[
-    ZIP_fit_pgx[,c(key(pgx_synergy_refs), "ZIP_fit"), with = FALSE],
+    ZIP_fit_pgx[, c(key(pgx_synergy_refs), "ZIP_fit"), with = FALSE],
     on = c(
         "block_id" = "block_id",
         "treatment1id" = "treatment1id",
@@ -340,37 +340,104 @@ pgx_synergy_refs |> aggregate(
 ## However, since we are converting from viability to response
 ## to align with the effect measurement used by SynergyFinder,
 ## Splitting into multiple steps is a safer approach.
-#combo_profiles_rep[,
-#    .computeZIPdelta(
-#        treatment1id = treatment1id,
-#        treatment2id = treatment2id,
-#        treatment1dose = treatment1dose,
-#        treatment2dose = treatment2dose,
-#        sampleid = sampleid,
-#        HS_1 = HS_1, HS_2 = HS_2,
-#        EC50_1 = EC50_1, EC50_2 = EC50_2,
-#        E_inf_1 = E_inf_1, E_inf_2 = E_inf_2,
-#        combo_viability = combo_viability,
-#        residual = "logcosh",
+combo_profiles_rep[,
+    .computeZIPdelta(
+        treatment1id = treatment1id,
+        treatment2id = treatment2id,
+        treatment1dose = treatment1dose,
+        treatment2dose = treatment2dose,
+        sampleid = sampleid,
+        HS_1 = HS_1, HS_2 = HS_2,
+        EC50_1 = EC50_1, EC50_2 = EC50_2,
+        E_inf_1 = E_inf_1, E_inf_2 = E_inf_2,
+        combo_viability = combo_viability,
+        residual = "logcosh",
 #        nthread = nthread,
-#        show_Rsqr = TRUE
-#)] -> pgx_delta_scores
-#pgx_delta_scores[, `:=`(ZIP_synergy = -1 * delta_score * 100, delta_score = NULL)]
-#pgx_delta_scores[, bio_rep := seq_len(.N),
-#    by = .(treatment1id, treatment2id, treatment1dose, treatment2dose, sampleid)
-#]
-#pgx_delta_scores[
-#    grepl(".*_1", treatment1id),
-#    `:=`(treatment1id = gsub("_1", "", treatment1id), bio_rep = bio_rep + 1)
-#]
+        show_Rsqr = TRUE
+)] -> pgx_delta_scores
+## Rescale delta score to percentage
+pgx_delta_scores[, `:=`(ZIP_synergy = delta_score * 100, delta_score = NULL)]
+pgx_delta_scores[, bio_rep := seq_len(.N),
+    by = .(treatment1id, treatment2id, treatment1dose, treatment2dose, sampleid)
+]
+pgx_delta_scores[
+    grepl(".*_1", treatment1id),
+    `:=`(treatment1id = gsub("_1", "", treatment1id), bio_rep = bio_rep + 1)
+]
+
+## == Check R squared consistency =========================
+pgx_ZIP_fit_merged <- ZIP_fit_pgx[pgx_delta_scores,
+    on = c(
+        "treatment1id" = "treatment1id",
+        "treatment2id" = "treatment2id",
+        "treatment1dose" = "treatment1dose",
+        "treatment2dose" = "treatment2dose",
+        "bio_rep" = "bio_rep",
+        "sampleid" = "sampleid"
+    )
+]
+#pgx_ZIP_fit_merged[, c(key(pgx_synergy_refs),
+#      "delta_Rsqr_1_to_2", "Rsqr_1_to_2",
+#      "delta_Rsqr_2_to_1", "Rsqr_2_to_1"),
+#    with = FALSE]
 #
-#pgx_synergy_scores <- pgx_synergy_scores[pgx_delta_scores, on = c(
-#    "treatment1id" = "treatment1id",
-#    "treatment1dose" = "treatment1dose",
-#    "treatment2id" = "treatment2id",
-#    "treatment2dose" = "treatment2dose",
-#    "bio_rep" = "bio_rep"
-#)][, `:=`(delta_Rsqr_1_to_2 = NULL, delta_Rsqr_2_to_1 = NULL)]
+#pgx_ZIP_fit_merged[
+#    delta_Rsqr_1_to_2 != Rsqr_1_to_2 |
+#    delta_Rsqr_2_to_1 != Rsqr_2_to_1
+#]
+# ==========================================================
+
+## == Check PGx ZIP synergy consistency ====================
+temp_key <- c(
+    "treatment1id",
+    "treatment1dose",
+    "treatment2id",
+    "treatment2dose",
+    "bio_rep"
+)
+
+combo_profiles |> aggregate(
+        ZIP_ref = (computeZIP(
+            treatment1dose = treatment1dose,
+            treatment2dose = treatment2dose,
+            HS_1 = HS_1,
+            HS_2 = HS_2,
+            E_inf_1 = E_inf_1 / 100,
+            E_inf_2 = E_inf_2 / 100,
+            EC50_1 = EC50_1,
+            EC50_2 = EC50_2
+        )),
+        by = c("block_id", key(combo_profiles))
+    ) -> pgx_ZIP_scores
+
+pgx_ZIP_scores <- pgx_ZIP_scores[
+    ZIP_fit_pgx[, c(temp_key,
+                    "Rsqr_1_to_2",
+                    "Rsqr_2_to_1",
+                    "ZIP_fit"), with = FALSE],
+    on = temp_key
+]
+
+pgx_ZIP_scores[, `:=`(
+    delta_score = (ZIP_ref - ZIP_fit) * 100
+)]
+
+pgx_ZIP_score_merged <- merge.data.table(
+    x = pgx_delta_scores,
+    y = pgx_ZIP_scores,
+    by = temp_key,
+    all = FALSE 
+)
+
+# ==========================================================
+
+pgx_synergy_scores <- pgx_synergy_scores[pgx_delta_scores, on = c(
+    "treatment1id" = "treatment1id",
+    "treatment1dose" = "treatment1dose",
+    "treatment2id" = "treatment2id",
+    "treatment2dose" = "treatment2dose",
+    "bio_rep" = "bio_rep"
+)][, `:=`(delta_Rsqr_1_to_2 = NULL, delta_Rsqr_2_to_1 = NULL)]
 
 setkeyv(pgx_synergy_scores,
         c("block_id", "treatment1id", "treatment1dose",

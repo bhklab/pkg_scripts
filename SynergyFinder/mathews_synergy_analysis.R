@@ -23,32 +23,32 @@ setDTthreads(nthread)
 
 ## == Download the Mathews Griner Drug Combination Screening Dataset ==========
 ## Data directory
-if (!dir.exists("../raw_data"))
-    dir.create(path = "../raw_data")
+data_dir <- ".local_data"
+if (!dir.exists(data_dir))
+    dir.create(data_dir, recursive=TRUE)
 
 ## Download dataset
-if (!file.exists("../raw_data/Griner_et_al.zip")) {
+zip_file <- file.path(data_dir, "Griner_et_al.zip")
+zip_src_url <- "https://ars.els-cdn.com/content/image/1-s2.0-S2001037015000422-mmc4.zip"
+if (!file.exists("../raw_data/Griner_et_al.zip"))
     utils::download.file(
-        url = "https://ars.els-cdn.com/content/image/1-s2.0-S2001037015000422-mmc4.zip",
-        method = "wget",
-        destfile = "../raw_data/Griner_et_al.zip"
+        url = zip_src_url,
+        destfile = zip_file
     )
-}
 
-if (!all(file.exists(
-    c("../raw_data/metadata.csv",
-      "../raw_data/responses.csv")
-    ))) {
+extract_files <- c("metadata.csv", "responses.csv")
+extract_paths <- file.path(data_dir, extract_files) |>
+    setNames(c("metadata", "responses"))
+if (!all(file.exists(extract_paths)))
     utils::unzip(
-        zipfile = "../raw_data/Griner_et_al.zip",
-        files = c("metadata.csv", "responses.csv"), ## extract dataset files only
-        exdir = "../raw_data"
+        zipfile = zip_file,
+        files = extract_files, ## extract dataset files only
+        exdir = data_dir
     )
-}
 
 
-viability <- fread("../raw_data/responses.csv")
-drug_data <- fread("../raw_data/metadata.csv")
+viability <- fread(extract_paths["responses"])
+drug_data <- fread(extract_paths["metadata"])
 ## ============================================================================
 
 ## == Prepare SynergyFinder input =============================================
@@ -426,7 +426,7 @@ pgx_ZIP_score_merged <- merge.data.table(
     x = pgx_delta_scores,
     y = pgx_ZIP_scores,
     by = temp_key,
-    all = FALSE 
+    all = FALSE
 )
 
 # ==========================================================
@@ -548,7 +548,3 @@ corrplot(cor_scores[
          cl.pos = 'b'
 )
 ## ============================================================================
-
-
-
-

@@ -53,10 +53,10 @@ drug_data <- fread(extract_paths["metadata"])
 
 ## == Prepare SynergyFinder input =============================================
 ## average viability over replicates
-viability |> aggregate(
+viability <- viability |> aggregate(
     viability = mean(Value),
     by = c("BlockId", "Col", "Row")
-) -> viability
+)
 
 ## "melt" dose-response matrix to a long-format table
 dt_blocks <- mapply(
